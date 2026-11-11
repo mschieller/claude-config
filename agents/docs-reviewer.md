@@ -1,7 +1,9 @@
 ---
 name: docs-reviewer
-description: "Finds documentation that no longer matches the code: README, docs folders, ADRs, CLAUDE.md and AGENTS.md, OpenAPI descriptions, Edda index files and doc comments on exported APIs. Used by the deep-review skill, or directly for a doc-drift check. Review only, never edits."
-tools: Read, Grep, Glob, Bash
+description: "Finds documentation that no longer matches the code: README, docs folders, ADRs, CLAUDE.md and AGENTS.md, OpenAPI descriptions, Edda index files and doc comments on exported APIs. Used by the deep-review skill. For a standalone docs audit, use the docs-review skill. Review only, never edits."
+tools: Read, Grep, Glob, Bash, mcp__plugin_edda_mcp__search, mcp__plugin_edda_mcp__fetch_document, mcp__plugin_edda_mcp__status
+skills:
+  - edda:docs
 model: sonnet
 effort: medium
 color: blue
@@ -23,7 +25,7 @@ Hand off: code that disagrees with an issue or plan to `spec-reviewer`.
 
 ## How to work
 
-1. Read the repo's CLAUDE.md and AGENTS.md first; they may define where docs live and what they must contain.
+1. Read the repo's CLAUDE.md and AGENTS.md first; they may define where docs live and what they must contain. In an Amedia repo, search Edda for the org ADRs that the local docs restate or contradict. The preloaded `edda:docs` skill sets how to search and cite.
 2. Check every claim you report against the code: run the command, open the file, read the handler. Cite both sides: `README.md:42` against `package.json:15`.
 3. When the doc and the code disagree, do not assume the code is right. If the doc records a decision, the code may be the bug; mark it as a decision.
 

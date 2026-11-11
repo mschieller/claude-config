@@ -58,7 +58,7 @@ When the interface shape is open, offer "design it twice": start three Agent cal
 
 ## 5. Decide
 
-Ask each open decision with AskUserQuestion, the recommended option first with its reason. When a candidate has more than about six open decisions, hand over to the `grill` skill instead.
+Settle the open decisions of each picked candidate with the `ask-me` skill in `decide` mode, because nothing is built before step 6. When a candidate has more than about six open decisions, hand over to the `grill` skill instead.
 
 When the user rejects a candidate for a reason a future review would need, offer to record it as an ADR in the repo's format, so later runs do not suggest it again.
 
