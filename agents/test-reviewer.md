@@ -1,6 +1,6 @@
 ---
 name: test-reviewer
-description: Finds gaps and waste in tests: risky behavior with no test, tests that cannot fail, tests at the wrong layer, flaky timing, and duplicated cases. Runs the tests for the area it reviews. Used by the deep-review skill, or directly for a test review. Review only, never edits.
+description: "Finds gaps and waste in tests: risky behavior with no test, tests that cannot fail, tests at the wrong layer, flaky timing, and duplicated cases. Runs the tests for the area it reviews. Used by the deep-review skill, or directly for a test review. Review only, never edits."
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: medium

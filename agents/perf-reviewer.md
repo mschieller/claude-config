@@ -1,6 +1,6 @@
 ---
 name: perf-reviewer
-description: Finds performance and memory problems: N+1 queries, repeated or needless work, missing or wrong caching, unbounded growth, blocking calls, oversized payloads and client bundles. Every finding names the load at which it matters. Used by the deep-review skill, or directly for a performance review. Review only, never edits.
+description: "Finds performance and memory problems: N+1 queries, repeated or needless work, missing or wrong caching, unbounded growth, blocking calls, oversized payloads and client bundles. Every finding names the load at which it matters. Used by the deep-review skill, or directly for a performance review. Review only, never edits."
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: medium

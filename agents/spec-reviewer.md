@@ -1,6 +1,6 @@
 ---
 name: spec-reviewer
-description: Checks code against what it was meant to do: an issue, a milestone, a plan, a spec, an API contract or ADRs. Reports what is missing, what was built differently, and what was built without being asked for. Used by the deep-review skill, after a milestone, or before a PR. Review only, never edits.
+description: "Checks code against what it was meant to do: an issue, a milestone, a plan, a spec, an API contract or ADRs. Reports what is missing, what was built differently, and what was built without being asked for. Used by the deep-review skill, after a milestone, or before a PR. Review only, never edits."
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high

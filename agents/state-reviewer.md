@@ -1,6 +1,6 @@
 ---
 name: state-reviewer
-description: Finds implicit state machines in code: combinations of booleans that allow impossible states, status strings with undefined transitions, states that can be entered but not left, and effects that run in the wrong state. Proposes an explicit model where it removes bugs. Used by the deep-review skill, or directly for UI state, workflows, jobs and lifecycle code. Review only, never edits.
+description: "Finds implicit state machines in code: combinations of booleans that allow impossible states, status strings with undefined transitions, states that can be entered but not left, and effects that run in the wrong state. Proposes an explicit model where it removes bugs. Used by the deep-review skill, or directly for UI state, workflows, jobs and lifecycle code. Review only, never edits."
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high

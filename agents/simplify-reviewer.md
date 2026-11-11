@@ -1,6 +1,6 @@
 ---
 name: simplify-reviewer
-description: Finds code that can be smaller or simpler without changing behavior: duplication, dead code, needless abstraction, helpers or framework features that already exist but are not reused, and files in the wrong place. Used by the deep-review skill, or directly for a simplification pass. Review only, never edits.
+description: "Finds code that can be smaller or simpler without changing behavior: duplication, dead code, needless abstraction, helpers or framework features that already exist but are not reused, and files in the wrong place. Used by the deep-review skill, or directly for a simplification pass. Review only, never edits."
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: medium

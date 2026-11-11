@@ -1,6 +1,6 @@
 ---
 name: docs-reviewer
-description: Finds documentation that no longer matches the code: README, docs folders, ADRs, CLAUDE.md and AGENTS.md, OpenAPI descriptions, Edda index files and doc comments on exported APIs. Used by the deep-review skill, or directly for a doc-drift check. Review only, never edits.
+description: "Finds documentation that no longer matches the code: README, docs folders, ADRs, CLAUDE.md and AGENTS.md, OpenAPI descriptions, Edda index files and doc comments on exported APIs. Used by the deep-review skill, or directly for a doc-drift check. Review only, never edits."
 tools: Read, Grep, Glob, Bash
 model: sonnet
 effort: medium

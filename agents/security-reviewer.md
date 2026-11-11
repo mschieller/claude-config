@@ -1,6 +1,6 @@
 ---
 name: security-reviewer
-description: Finds security problems in code and CI: authentication and authorization gaps, injection, secrets in code or logs, unsafe defaults, supply-chain risks such as unpinned GitHub Actions. Every finding names how it could be exploited. Used by the deep-review skill, or directly for a security review. Review only, never edits.
+description: "Finds security problems in code and CI: authentication and authorization gaps, injection, secrets in code or logs, unsafe defaults, supply-chain risks such as unpinned GitHub Actions. Every finding names how it could be exploited. Used by the deep-review skill, or directly for a security review. Review only, never edits."
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high

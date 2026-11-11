@@ -19,7 +19,7 @@
 
 - Delegate only work that is parallelizable, read-heavy, or larger than one context window. Do small or sequentially dependent work in the main session.
 - Code edits and judgment calls stay in the main session unless the work splits into independent, fully specified pieces.
-- Every Agent call sets `model` and `effort` explicitly, including the built-in Explore agent (`model: haiku`). Agents in `~/.claude/agents` set their own model and effort.
+- Every Agent call sets `model` and `effort` explicitly, including the built-in Explore agent (`model: haiku`). The exception is the agents in `~/.claude/agents`. Their files set model and effort, so calls to them omit both, because a per-call value overrides the file.
 
 | Task | Model | Effort |
 |---|---|---|

@@ -10,6 +10,8 @@ argument-hint: "[issue number or extra context]"
 
 Own the work from the current working tree to a PR that is ready to merge. The user merges.
 
+Stop at the step the request names. "Commit" stops after step 3. "Commit and push" or "push the changes" stops after the push in step 4, without opening a PR. "Watch the CI" or "CI errored" starts at step 5 on the existing PR. "Ship", "create the PR" or "push and create the PR" runs every step.
+
 ## 1. Preflight
 
 - Run `git status --short`. If it shows changes unrelated to the task, ask which to include. Never stash or discard the user's changes.

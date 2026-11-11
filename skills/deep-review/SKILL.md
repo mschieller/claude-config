@@ -36,9 +36,9 @@ The roster lives in `~/.claude/agents/`:
 | `docs-reviewer` | Docs, ADRs, agent docs and Edda files against the code |
 | `test-reviewer` | Missing tests for risky behavior, tests that cannot fail |
 
-Choose up to N reviewers for the scope and focus. Always include `bug-reviewer`. Include `spec-reviewer` for a milestone, a PR with a linked issue, or a plan. Include `security-reviewer` when the scope touches auth, input handling, secrets or CI workflows. For a large repo, run the same reviewer on two separate areas instead of adding a reviewer with nothing to look at.
+Choose up to N reviewers for the scope and focus. Include `bug-reviewer` whenever the scope contains code. A plan or doc scope uses `spec-reviewer`, `docs-reviewer` and the reviewers whose area the plan covers. Include `spec-reviewer` for a milestone, a PR with a linked issue, or a plan. Include `security-reviewer` when the scope touches auth, input handling, secrets or CI workflows. For a large repo, run the same reviewer on two separate areas instead of adding a reviewer with nothing to look at.
 
-Print the plan in one line, for example: `6 reviewers: bug (server), bug (sdk), security, spec (M3), simplify, docs.` Then launch every reviewer in a single message, one Agent call each, with `subagent_type` set to the agent name. The agents carry their own model and effort. Each brief contains:
+Print the plan in one line, for example: `6 reviewers: bug (server), bug (sdk), security, spec (M3), simplify, docs.` Then launch every reviewer in a single message, one Agent call each, with `subagent_type` set to the agent name. The agent files set model and effort, so omit both on these calls; a per-call value would override the file. A repo can have its own agent with the same name, and the project agent wins. Its output may then lack a `Kind:` line or use other severity words; map them to blocker, should or nit and classify the kind yourself in step 4. Each brief contains:
 
 - the scope as exact paths, the diff command, or the milestone and issue numbers
 - the focus words, if any

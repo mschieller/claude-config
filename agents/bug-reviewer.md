@@ -1,6 +1,6 @@
 ---
 name: bug-reviewer
-description: Finds correctness bugs in code: wrong behavior, races, broken error handling, data loss, broken callers. Every finding carries a concrete failure scenario. Used by the deep-review skill, or directly for a correctness review of a diff or a codebase area. Review only, never edits.
+description: "Finds correctness bugs in code: wrong behavior, races, broken error handling, data loss, broken callers. Every finding carries a concrete failure scenario. Used by the deep-review skill, or directly for a correctness review of a diff or a codebase area. Review only, never edits."
 tools: Read, Grep, Glob, Bash
 model: opus
 effort: high
