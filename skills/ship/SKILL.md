@@ -1,14 +1,14 @@
 ---
 name: ship
-description: Take finished work to a pull request that is ready to merge. Runs the checks, commits, opens or updates the PR with a concise body, watches CI and reviews, fixes failures and real findings, and stops when the PR is ready. Never merges unless told. Use when the user says "ship", "create the PR", "push and create the PR", "commit and push", "watch the CI" or "CI errored".
+description: Take finished work to a pull request with green CI. Runs the checks, commits, opens or updates the PR with a concise body, watches CI, fixes failures and the real review findings that are already there, and stops when CI is green. Never waits for a reviewer. Never merges unless told. Use when the user says "ship", "create the PR", "push and create the PR", "commit and push", "watch the CI" or "CI errored".
 argument-hint: "[issue number or extra context]"
 ---
 
-<!-- PR body and diagram guidance adapted from mattpocock/skills pr (MIT, see LICENSE), which credits Dex Horthy's show-me skill. Review and CI rules adapted from t3dotgg/tstack file-pr and babysit-pr. -->
+<!-- PR body and diagram guidance adapted from mattpocock/skills pr (MIT, see LICENSE), which credits Dex Horthy's show-me skill. Review and CI rules adapted from t3dotgg/tstack file-pr and babysit-pr (MIT, see LICENSE). -->
 
 # Ship
 
-Own the work from the current working tree to a PR that is ready to merge. The user merges.
+Own the work from the current working tree to a PR with green CI. The user merges.
 
 Stop at the step the request names. "Commit" stops after step 3. "Commit and push" or "push the changes" stops after the push in step 4, without opening a PR. "Watch the CI" or "CI errored" starts at step 5 on the existing PR. "Ship", "create the PR" or "push and create the PR" runs every step.
 
@@ -16,8 +16,7 @@ Stop at the step the request names. "Commit" stops after step 3. "Commit and pus
 
 - Run `git status --short`. If it shows changes unrelated to the task, ask which to include. Never stash or discard the user's changes.
 - Find the base branch: the PR's `baseRefName` if a PR exists, otherwise `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. Never assume `main`.
-- If the current branch is the base branch, create a branch named after the change, following the repo's existing branch names.
-- Run `git fetch origin`. If the branch is behind the base, bring it up to date with the `sync-base` skill before going further.
+- Name the branch `<type>/<slug>`: a conventional commit type (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `ci` or `build`) and a kebab-case slug of at most five words that says what the change does, such as `fix/login-redirect-loop`. On the base branch, create it with `git switch -c <name>`. On any other branch, look up its PR with `gh pr view --json state`. If the PR is `OPEN` or `CLOSED`, keep the name, because the PR is tied to it. If there is no PR or it is `MERGED`, rename the branch with `git branch -m <name>`, unless its name already starts with one of those types and a slash. A tool such as T3 may have named the branch that way already. Keep such a name as it is, and do not rename it to get a better slug.
 
 ## 2. Checks
 
@@ -29,7 +28,9 @@ Group the changes into logical commits. Follow the repo's commit title conventio
 
 ## 4. Open or update the PR
 
-Check for an existing PR first: `gh pr view --json number,url,state,body`. If one exists, push, and update the body when the scope has changed. If none exists, push with `-u` and open a real PR, not a draft, so review bots run.
+Run `git fetch origin`. If the branch is behind the base, bring it up to date with the `sync-base` skill before pushing. The sync runs here, after the commit, because `sync-base` stops when tracked files have uncommitted changes.
+
+Check for an existing PR first: `gh pr view --json number,url,state,body`. The command also returns merged and closed PRs. If an open one exists, push, and update the body when the scope has changed. If none exists or the PR is `MERGED`, push with `git push -u origin HEAD` and open a real PR, not a draft, so review bots run. If step 1 renamed a branch that was already pushed, then delete the old name from the remote with `git push origin --delete <old-name>`. The new name holds the same commits. If the PR is `CLOSED`, ask whether to reopen it or open a new one.
 
 Title: follow the repo's convention from recently merged PRs. Say why the change matters, not which mechanism changed.
 
@@ -72,7 +73,31 @@ When a wake needs no action, end the turn without a message.
 
 ## 6. On each wake
 
-Act only on checks and comments newer than the latest push.
+Act on failed checks for the head commit, and on every review thread or PR comment that is unresolved and that you have not answered. Ignore a failure on an older commit. On the first wake, start with the comments that were there before the watch began.
+
+`gh pr view` does not show review threads. List the unresolved ones with:
+
+```
+gh api graphql -F owner='{owner}' -F repo='{repo}' -F number=<n> -f query='
+query($owner: String!, $repo: String!, $number: Int!) {
+  repository(owner: $owner, name: $repo) {
+    pullRequest(number: $number) {
+      reviewThreads(first: 100) {
+        nodes { id isResolved path line comments(first: 20) { nodes { author { login } body } } }
+      }
+    }
+  }
+}' --jq '.data.repository.pullRequest.reviewThreads.nodes[] | select(.isResolved | not)'
+```
+
+Resolve a thread with its `id`:
+
+```
+gh api graphql -f threadId=<id> -f query='
+mutation($threadId: ID!) {
+  resolveReviewThread(input: {threadId: $threadId}) { thread { isResolved } }
+}'
+```
 
 - **Failed check.** Read the failed log with `gh run view <run-id> --log-failed`. Decide whether it is a real failure or an infrastructure flake. Fix real failures, run the checks from step 2, commit and push. Re-run a flake once with `gh run rerun <run-id> --failed`; if it fails again, treat it as real.
 - **Conflict or branch behind.** Use the `sync-base` skill, run the checks, and push.
@@ -83,7 +108,7 @@ Keep the PR at the size its goal needs. Decline extra tests, guards for cases th
 
 ## 7. Stop
 
-The PR is ready when the required checks pass on the latest commit, no review thread is unresolved, and GitHub reports it mergeable and not behind the base.
+Ship is done when the required checks pass on the head commit. Before you stop, handle the review comments that are already there, as in step 6. A fix starts another CI round. Never wait for a review that has not arrived, and never wait for an approval.
 
 Call `unwatch_pull_request` before you stop, also when you stop to ask the user something. Report the PR link, the head commit, the check results, what you fixed along the way, and any follow-ups you declined.
 

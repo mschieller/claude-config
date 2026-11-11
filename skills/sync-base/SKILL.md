@@ -1,7 +1,7 @@
 ---
 name: sync-base
 description: Bring the current branch up to date with its base branch (main, master or the PR's base) by merging. Reads what landed on the base and why before merging, resolves conflicts with both intents understood, then hunts for semantic conflicts git cannot see and runs the repo's checks. Use when the user asks to merge main or master in, fix conflicts, update or sync the branch, or when the ship skill finds the branch behind.
-argument-hint: "[base branch, only when it cannot be detected]"
+argument-hint: "[base branch, overrides detection]"
 ---
 
 # Sync base
@@ -14,12 +14,12 @@ Merge the base branch into the current branch after understanding what landed on
 - Know what the base's side of a conflict was for before resolving it. Read the commit that introduced it, not only the hunk.
 - Never use `-X ours`, `-X theirs`, or `git checkout --ours/--theirs` on a file where both sides made real edits. Whole-file side-taking is fine only for generated files and for a file one side deleted.
 - Never discard the branch's work to make a conflict go away, and never `git merge --abort` and report failure. Resolve it, or stop with the conflicted state intact and explain what blocks you.
-- Never merge over a dirty tree.
+- Never merge over uncommitted changes to tracked files, and never stash them away. Worktrees and other sessions share one stash stack, so a pop can take another session's entry.
 
 ## 1. Preflight
 
-1. Find the base: the PR's `baseRefName` from `gh pr view --json baseRefName`, else `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`, else the argument. If the current branch is the base, there is nothing to sync.
-2. Run `git status --porcelain`. If the tree is dirty, ask whether to commit or stash. A stash taken here is popped in step 6.
+1. Find the base: the argument when one is given, else the PR's `baseRefName` from `gh pr view --json baseRefName`, else `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. If the current branch is the base, there is nothing to sync.
+2. Run `git status --porcelain --untracked-files=no`. If it lists changes, ask whether to commit the work first or stop. Untracked files do not count, because git refuses a merge that would overwrite one.
 3. Run `git fetch origin --prune` and work against `origin/<base>`, never a local copy that may be stale.
 4. If `git merge-base --is-ancestor origin/<base> HEAD` succeeds, report "already up to date" and stop.
 
@@ -68,8 +68,6 @@ When a check fails for a reason unrelated to the merge, check whether it fails o
 
 ## 6. Commit and report
 
-If step 1 stashed, commit the merge first, then `git stash pop` and resolve whatever the pop raises with the same rules. Report the restore.
-
 The merge commit message says what came in and how the non-obvious conflicts were resolved, not only `Merge branch 'main'`.
 
 Report:
@@ -79,4 +77,4 @@ Report:
 - every semantic hit, fixed or reported as follow-up
 - check results, including anything still failing and why
 
-Run on its own, ask before pushing. When the `ship` skill called this skill, push and return to ship.
+Run on its own, ask before pushing. When the `ship` skill called this skill, return to ship without pushing. Ship owns the push.
