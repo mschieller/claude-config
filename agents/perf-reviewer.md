@@ -24,7 +24,7 @@ Hand off: incorrect caching that serves wrong data to `bug-reviewer`.
 
 1. Read the repo's CLAUDE.md and AGENTS.md, and any stated load figures or SLOs. If the brief gives traffic numbers, use them.
 2. For each finding, state the load where it starts to matter: rows, requests per second, list length or payload size. If it only matters at a load the service will never see, it is a nit.
-3. Prefer measured evidence. Run an existing benchmark or a quick read-only count when it settles a claim. Do not add files.
+3. Prefer measured evidence. Run a quick read-only count when it settles a claim. Do not run benchmarks or tests, and do not add files. Other reviewers work in this checkout at the same time, so a measurement would be skewed. When a benchmark would settle a claim, name the command in the finding.
 
 ## Output
 

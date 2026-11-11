@@ -1,7 +1,7 @@
 ---
 name: grill
-description: Interview the user in rounds of numbered questions with recommended answers until every decision in a plan is settled. Use when the user says "grill", "grill me", or asks to stress-test a plan, design or idea. With the argument "docs", also record the decisions in the repo.
-argument-hint: "[docs] <plan, issue or topic>"
+description: Interview the user in rounds of numbered questions with recommended answers until every decision in a plan is settled. Use when the user says "grill", "grill me", or asks to stress-test a plan, design or idea. With the argument "docs", also record the decisions in the repo. With "issues", also draft GitHub issues with acceptance criteria.
+argument-hint: "[docs] [issues] <plan, issue or topic>"
 ---
 
 <!-- Adapted from mattpocock/skills grilling, grill-with-docs and domain-modeling (MIT, see LICENSE). Changes: grounding step, round cap, answer shortcuts, summary format, docs mode that follows the repo's own convention. -->
@@ -64,3 +64,26 @@ Record a decision only when all three hold:
 When the repo has no format of its own, use a numbered file (`0001-slug.md`) with a title and one to three sentences: the context, the decision and the reason. Add "Considered options" or "Consequences" only when a future reader needs them.
 
 When a term gets defined during the session, add it to the glossary in the same pass. Docs state the current decision only. When a decision replaces an older one, rewrite or supersede the old record.
+
+## 6. Issues mode
+
+Only when the user passed `issues`. After the summary, split the settled plan into issues, one per unit of work that can be built and reviewed on its own. Draft each one like this:
+
+```markdown
+<title: the outcome, not the task>
+
+<one or two sentences: the problem, then what this issue delivers>
+
+## Acceptance criteria
+
+1. <an input or action, and the result someone can observe>
+2. <the next one>
+
+## Out of scope
+
+<only when a reader could assume more than the issue covers>
+```
+
+Number the criteria, because `spec-reviewer` cites them as "issue #42 criterion 3". A criterion names behavior someone can check, not an implementation step. Put each decision from the table into the issue it constrains, and link issues that depend on each other.
+
+Show every draft and create nothing until the user approves. If the user has not named a milestone, ask which one to use or whether to create one. Create a milestone with `gh api repos/{owner}/{repo}/milestones -f title=<name>`, and each issue with `gh issue create --title <title> --body-file <file> --milestone <name>`. Report the issue numbers.

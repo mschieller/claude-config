@@ -23,6 +23,8 @@ Find where the documentation disagrees with itself or with the code, then settle
 - `docs` or `code`: run that pass only.
 - Doc names or areas narrow the findings to those docs or areas. Still read the other docs, because a contradiction needs both sides in view.
 
+Run `git status --porcelain --untracked-files=no` and note whether tracked files have uncommitted changes. The commit rules in steps 5 and 6 depend on it.
+
 Read the repo's CLAUDE.md and AGENTS.md first. They name the docs layout, the working principles and any status tracking (status lines, a roadmap with open decisions, a decision register).
 
 Build the known-deferred list from wherever the repo records deferred work. Exclude those items from findings and confirm them in one line in the summary. A deferred item becomes a finding only when its recorded status is now wrong.
@@ -74,28 +76,31 @@ Below the table:
 - Checked and aligned: the areas that match, named, so a clean area reads as verified.
 - Improvement proposals from docs pass point 9, in their own section, each naming the decision it challenges.
 
+Then run the repo's checks and commit the mechanical fixes as one commit, so each later commit holds one finding. Stage only the files you changed. If you are on the default branch, create a branch first. If tracked files had uncommitted changes at the start, commit nothing in this run, here or in step 6, and say so in the wrap-up.
+
 If there are no findings and nothing was fixed, report "No findings", list the aligned areas, and stop.
 
 ## 6. Walk the findings
 
-Take the findings in table order. For each one, show:
+Hand the findings to the `ask-me` skill in table order. It sets how each one is asked and applied. These rules add to it.
 
-1. Why it is flagged, quoting both anchors.
-2. What it causes if left.
-3. For a divergence, the argument: what the doc's version gives, what the code's version gives, and which principle decides it. The verdict is "the doc is stale", "the code is a bug", or "both are wrong" with a third design.
-4. The drafted fix, written out: doc text, code change, comment rewrite or the missing test.
+The outline for each finding also holds:
 
-Then ask right away with AskUserQuestion: two to four options, the recommended one first with its reason, and always a defer option. The user can pick "Other" to discuss first; stay on the finding until it is resolved.
+1. Both anchors, quoted.
+2. For a divergence, the argument: what the doc's version gives, what the code's version gives, and which principle decides it. The verdict is "the doc is stale", "the code is a bug", or "both are wrong" with a third design.
+3. The drafted fix, written out: doc text, code change, comment rewrite or the missing test.
+
+Every dialog also has a defer option.
 
 For an improvement proposal, show the current decision and its recorded reason fairly first, then the improvement, the new basis that justifies reopening it, and the decisions that depend on it and would have to move too.
 
-When an option is chosen, apply it fully before the next finding:
+Applying an answer means all of this, before the next finding:
 
 - Change the code and the doc together.
 - Update the home doc only, and update any status line, register or roadmap the repo keeps.
 - Record a deferred item where the repo records deferred work.
 - Run the repo's checks for what changed. Never commit while a check fails.
-- Commit the finding as one commit containing all its edits. Nothing is committed for "keep" or "defer". If the run started on the default branch, create a branch first.
+- Commit the finding as one commit containing all its edits. Nothing is committed for "Leave as is" or "defer". If you are still on the default branch, create a branch first.
 
 ## 7. Wrap up
 

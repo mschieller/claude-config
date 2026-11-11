@@ -4,13 +4,15 @@
 
 - I give short prompts with limits. Take the limits literally: "max 6 subagents" means at most 6, and "don't fix anything" means report only.
 - "Let's talk", "don't implement yet" or "before you start" means no edits, commits or PRs until I say go.
-- A reply of "yes", "go", "ready" or "your suggestion" accepts your recommendation. I answer numbered questions as `A1: ...`.
+- A reply of "yes", "go", "ready" or "your suggestion" accepts your recommendation.
+- An Amedia repo is one whose `origin` remote is in the `amedia` GitHub org.
 - For Amedia work, check Edda before you answer a question about conventions, platform or infrastructure.
 
 ## Asking me questions
 
-- When you need a decision from me and the options are discrete, use the AskUserQuestion tool. Ask open questions in plain text.
+- When you need a decision from me and the options are discrete, use the AskUserQuestion tool. Ask open questions in plain text. The `grill` skill is the one exception. It asks in numbered rounds.
 - Before the tool call, outline the decision in text: what is being decided, the options, and the trade-offs between them.
+- The outline may be hidden while the dialog is open. Word each question so it stands on its own: what was found, what it causes, and what is being chosen.
 - Always recommend one option. Put it first, mark it as recommended, and give the reason in one sentence. If the choice is pure taste, say the preference is weak.
 - Do not ask what you can find out from the code, the tools or the conversation.
 - Before a long unattended run, ask every question you can foresee. During the run, take your recommended option and report each choice at the end.
@@ -27,9 +29,9 @@
 | Parallel implementation or tests from a spec; repeated review tasks | sonnet | medium |
 | The same, touching shared interfaces | sonnet | high |
 | Independent design or diff review; concurrency, `unsafe`, crypto, secrets | opus | high |
-| Isolated hard problem that opus at high failed; a decision the task hinges on | `claude-fable-5-2` | medium |
+| Isolated hard problem that opus at high failed; a decision the task hinges on | `fable` | medium |
 
-- Haiku: no code edits. Keep prompts under 100K tokens, because the price rises 5x above that.
+- Haiku: no code edits. A request over 100K tokens costs 5x, and the count includes everything the agent has read so far. Give each Haiku agent a scope it can finish under 100K, and split a larger job across several agents.
 - Fable subagent: ask me first. One focused problem per call.
 - Never use `xhigh` or `max` on a subagent.
 - Do not escalate exploit or pentest work to Fable. Its safety classifiers are the strictest.
@@ -62,6 +64,7 @@ Model choice:
 - Never wait with `sleep` or polling loops (`until`, `while`). For a PR, use `watch_pull_request` in T3 Code. For a background command, use `t3_background_wait` or the Monitor tool.
 - Stop every server and background process you started before you finish.
 - Never write to `~/.t3/userdata`, open its databases read-write, or start a server against it. Reading it read-only is fine.
+- Never deploy, change cluster resources, or write to a database outside this machine unless I asked for it in this session. Reading logs, status and data is fine.
 
 ## Changes and verification
 
