@@ -1,7 +1,6 @@
 ---
 name: audit
 description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, pins every version, moves Node to the active LTS, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerabilities". For a security review of code, use security-review.
-argument-hint: "[whoami owner id, default okt-bruk-presentasjonsplattform]"
 ---
 
 # Audit
@@ -11,8 +10,8 @@ Do the whole job in one run and stop at the summary. The user picks the PR shape
 ## Rules
 
 - Commit locally, one commit per unit, in the order of the steps below. A stack can then be cut at commit boundaries.
-- Never push the audited repo or open a PR in it before the user has picked the PR shape. The one PR this skill opens on its own is the one against `amedia/renovate` in step 4.
-- Steps 3 and 4 run only in an Amedia repo, one whose `origin` remote is in the `amedia` GitHub org. In any other repo, skip them and say so in the summary.
+- Never push the audited repo or open a PR in it before the user has picked the PR shape. The one PR this skill opens on its own is the one against `amedia/renovate` in step 5.
+- Steps 3 and 5 run only in an Amedia repo, one whose `origin` remote is in the `amedia` GitHub org. In any other repo, skip them and say so in the summary.
 - The reference file for the package manager holds the commands. The repo pins its own package manager version, so check a command against its `--help` in the repo when it fails or behaves differently.
 - A dependency version is always written exact, as `1.2.3`. No `^`, no `~`, no range. `peerDependencies` are the exception and keep their ranges.
 
@@ -21,28 +20,30 @@ Do the whole job in one run and stop at the summary. The user picks the PR shape
 Change nothing in this step.
 
 - Run `git status --short`. If the tree has uncommitted changes, add that to the questions in step 2. If the current branch is the default branch, create `chore/audit` from it.
-- Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 5, 7 and 8 and say so in the summary.
+- Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 6, 8 and 9 and say so in the summary.
 - List every `package.json` in the repo and whether the repo is a workspace.
 - Run the frozen install.
 - Record the audit counts for info, low, moderate, high and critical. These are the "before" numbers in the summary.
 - Record the outdated packages, split into those with a newer patch or minor and those with a newer major.
 - Find every place that sets a Node version: `engines.node`, `.node-version`, `.nvmrc`, `.tool-versions`, `volta`, `node-version` inputs in workflows, every `FROM` in a Dockerfile, `@types/node` and a `@tsconfig/node<major>` base.
 - Find the active LTS line of Node. In `https://raw.githubusercontent.com/nodejs/Release/main/schedule.json` it is the line whose `lts` date has passed and whose `maintenance` date has not. Its newest release is the first entry in `https://nodejs.org/dist/index.json` whose `lts` field holds that line's codename.
-- In an Amedia repo, run `apptool who info` and read the validation problems from its plain output. The `--json` output leaves them out. Find every whoami file with the glob `**/whoami*.yaml`.
+- In an Amedia repo, run `apptool who info` and read the validation problems from its plain output. The `--json` output leaves them out. Find every whoami file with the glob `**/whoami*.yaml`, and compare the `owner` in each with the owner ids in `apptool who owners --json`.
+- Look for a `CODEOWNERS` file in `.github/`, at the root and in `docs/`, the three places GitHub reads. When there is none, collect candidates for the question in step 2: the user's own login from `gh api user`, and in an org repo the user's teams from `gh api user/teams`, filtered to that org and to the teams that pass the access check in step 4.
 - In an Amedia repo, record four facts about Renovate:
   - whether a Renovate config exists: `renovate.json`, `renovate.json5` or `.renovaterc`, at the root or under `.github/`
   - whether a Dependabot config exists, and which workflows mention `dependabot`
   - whether `config/renovate-config.js` in `amedia/renovate` lists the repo
   - whether the bot has an open onboarding PR in the repo, titled "configure renovate"
-- Run every script in each `package.json` that tests, lints, typechecks or builds. Record what already fails. This is the baseline for step 9.
+- Run every script in each `package.json` that tests, lints, typechecks or builds. Record what already fails. This is the baseline for step 10.
 
 ## 2. Questions
 
-Ask everything the survey raised in one round with AskUserQuestion, with the recommended option first. Ask nothing the survey can answer. Typical questions:
+Ask everything the survey raised in one round with AskUserQuestion, with the recommended option first. A round may take several dialogs, since one dialog holds four questions. Ask nothing the survey can answer. Ask about the whoami owner first, because the channel and section questions depend on who the owner is. Typical questions:
 
 - A whoami problem with more than one valid fix. For an unknown system, offer the ids from `apptool who systems`. For a redundant channel whose value differs from the owner's, offer to remove it and use the owner's channel, or to keep it and leave the problem reported. For a key that appears twice with different values, offer each value.
-- A whoami owner that is neither the owner id from the arguments nor one of its aliases in `apptool who owners <id>`. The repo may belong to another team.
-- The section of `config/renovate-config.js` the repo belongs under, when the owner from the arguments is not the default. Offer the section comments in that file.
+- A whoami owner that is not the `id` of any owner in `apptool who owners --json`. Offer the closest owner ids, and recommend the one whose `aliases` or `name` hold the current value or resemble it. Recommend none when nothing resembles it.
+- The section of `config/renovate-config.js` the repo belongs under, when no section comment in that file appears in the owner's `id`, `name` or `aliases`, ignoring case. Offer the section comments.
+- A missing `CODEOWNERS` file. Ask whether to add one. If yes, ask who owns the code: one owner for everything, or different owners for different paths, and which teams or people. Offer the candidates from the survey and let the user name others. Recommend one team for `*` when the user is in a team with access to the repo.
 - Tests that fail before any change. Offer to continue with those failures noted, or to stop.
 - Uncommitted changes in the tree.
 
@@ -50,14 +51,29 @@ After this round the run is unattended. When something new comes up, take the op
 
 ## 3. Whoami
 
-- Set `owner` to the id from the arguments, or to `okt-bruk-presentasjonsplattform` when none is given.
-- Fix each validation problem from the survey. An owner alias becomes the owner id.
+- Keep an `owner` that is the `id` of an owner in `apptool who owners --json`. Otherwise set it to the id chosen in step 2.
+- Fix each validation problem from the survey.
 - thewho calls a channel redundant when the whoami file sets a channel type that the owner's record in `apptool who owners <id>` also has, whatever the values are. Remove the key when its value equals the owner's. When the value differs, removing it moves those notifications to the owner's channel, so that is a question for step 2.
 - When a key appears twice with the same value, keep one. When the values differ, that is a question for step 2.
 - thewho reads the default branch, so `apptool who info` shows the old problems until the change is merged. Check the edit instead: the file parses as YAML, no key appears twice, the owner exists in `apptool who owners` and the system exists in `apptool who systems`. A GitHub check validates the schema on the PR.
 - Commit.
 
-## 4. Renovate
+## 4. Code owners
+
+Skip this step when the repo has a `CODEOWNERS` file or the user declined one in step 2.
+
+- Write `.github/CODEOWNERS` in the form the user chose. A team is `@<org>/<team-slug>` and a person is `@<login>`. One owner for everything is a single line:
+
+  ```
+  * @<org>/<team-slug>
+  ```
+
+- With several owners, write one line per path. The last line that matches a file decides its owners, so put `*` first and the narrower paths after it.
+- GitHub ignores an owner that has no write access to the repo. Check each one before you write it. `gh api orgs/<org>/teams/<team-slug>/repos/<org>/<repo>` answers 404 for a team without access. `gh api repos/<org>/<repo>/collaborators/<login>/permission` gives a person's permission. Report an owner that fails the check and leave it out.
+- GitHub validates the file only on a pushed branch. Put the command for that check in the summary: `gh api "repos/<org>/<repo>/codeowners/errors?ref=<branch>"`.
+- Commit.
+
+## 5. Renovate
 
 Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos listed in `config/renovate-config.js`.
 
@@ -79,10 +95,11 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
   ```
 
   The run is good when the log says `Config file exists` for the config, has no line about an onboarding branch, and ends `Dependency extraction complete` with counts that cover the package files, the Dockerfiles and the workflows. Collect every `Failed to look up` line for the summary. A private package fails here because the local run has no registry login. The local run only looks up versions. It does not simulate branches or PRs.
-- If `config/renovate-config.js` does not list the repo, open a PR that adds it. Clone `amedia/renovate` into the scratchpad, branch, add `"amedia/<repo>",` as the last line of the block under the section comment, `// Presentasjonsplattform` unless step 2 chose another, and follow that repo's commit and PR title convention. Open one PR per audited repo. In T3 Code, link the PR to the thread. Do not watch or merge it.
+- If `config/renovate-config.js` does not list the repo, open a PR that adds it. Clone `amedia/renovate` into the scratchpad, branch, add `"amedia/<repo>",` as the last line of the block under the section comment that matches the owner, or the one chosen in step 2, and follow that repo's commit and PR title convention. Run `node --check config/renovate-config.js` before you push, because that repo's CI does. Open one PR per audited repo. In T3 Code, link the PR to the thread. Do not watch or merge it.
 - Leave an open onboarding PR from the bot alone and name it in the summary. The config from this run replaces it.
+- The shared preset takes the reviewers of Renovate's PRs from `CODEOWNERS`. When the repo has no such file after step 4, say in the summary that Renovate's PRs get no reviewers.
 
-## 5. Pin and settings
+## 6. Pin and settings
 
 - Apply the settings from the reference file.
 - Write every entry in `dependencies`, `devDependencies` and `optionalDependencies` as the exact version the lockfile resolves today. Do not strip the `^` or `~` from the range. That gives the lowest version the range allows, which can be older than the installed one.
@@ -90,7 +107,7 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 - Update the lockfile without installing. Its resolved versions must not change in this commit.
 - Commit.
 
-## 6. Node
+## 7. Node
 
 - The target is the newest release of the active LTS line from the survey.
 - Update every place from the survey and keep the form each place already uses, such as `26`, `>=26` or `26.13.1`. Amedia's CI installs the version in `engines.node` and fails or warns when the major in the Dockerfile's final `FROM` differs.
@@ -98,7 +115,7 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 - Set `@types/node` to the newest version with the same major as Node.
 - Commit.
 
-## 7. Updates and fixes
+## 8. Updates and fixes
 
 Work in this order and stop as soon as the audit is clean and nothing is outdated within its major.
 
@@ -110,7 +127,7 @@ Work in this order and stop as soon as the audit is clean and nothing is outdate
 
 Commit when done.
 
-## 8. Majors
+## 9. Majors
 
 Attempt a major upgrade only when an advisory cannot be fixed without it. For every other package with a newer major, write one line for the summary with what the major changes for this repo, and leave it for Renovate.
 
@@ -121,14 +138,14 @@ For each major an advisory needs:
 - When nothing the repo uses breaks, or the needed changes are small and clear, upgrade and run the tests. Commit each major on its own.
 - When the tests fail and the fix is not small, or you are not confident, undo the upgrade and record the package, the target version and the reason.
 
-## 9. Verify
+## 10. Verify
 
 - Run every script from the survey's baseline again. A script that passed before must pass now.
 - When a Dockerfile changed and Docker is available, build the image.
 - Trace each new failure to its commit. Fix it there, or revert that commit and record why.
 - Record the audit counts again. These are the "after" numbers.
 
-## 10. Summary
+## 11. Summary
 
 Report in this order:
 
@@ -137,20 +154,21 @@ Report in this order:
 - Each updated package as `{name}: {old} -> {new}`, under `dependencies` and `devDependencies`.
 - Node: the version before and after, and each file that changed.
 - Whoami: what changed, and any problem left. Say that `apptool who info` shows the result only after the merge.
+- Code owners: the file added and its owners, or that the repo already had one, or that the user declined. The command that checks the file after the push.
 - Renovate: added, updated or already correct. The dry-run result and the failed lookups. The URL of the `amedia/renovate` PR, and that it should merge after the repo's own PR, because the bot opens an onboarding PR in a listed repo that has no config. Any open onboarding PR.
 - Majors: each one done, and each one not done with its reason.
 - Overrides added and removed.
 - What the user must test by hand because this run could not.
 - Each choice made without asking.
-- The PR shape recommendation from step 11.
+- The PR shape recommendation from step 12.
 
-## 11. PR shape
+## 12. PR shape
 
 Count the change with `git diff --numstat <merge-base> HEAD`, leaving out lockfiles.
 
 Recommend a single PR when no major upgrade needed source changes and the count is under about 300 changed lines. Otherwise recommend a stack, cut at commit boundaries in this order, bottom first:
 
-1. whoami and Renovate
+1. whoami, code owners and Renovate
 2. pin and settings
 3. Node
 4. updates and fixes
