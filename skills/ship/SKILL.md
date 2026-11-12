@@ -1,6 +1,6 @@
 ---
 name: ship
-description: Take finished work to a pull request with green CI. Runs the checks, commits, opens or updates the PR with a concise body, watches CI, fixes failures and the real review findings that are already there, and stops when CI is green. Never waits for a reviewer. Never merges unless told. Use when the user says "ship", "create the PR", "push and create the PR", "commit and push", "watch the CI" or "CI errored".
+description: Take finished work to a pull request with green CI. Runs the checks, commits, opens or updates the PR with a concise body, watches CI, fixes failures and the real review findings that are already there, and stops when CI is green. Opens a stack of PRs with `gh stack` when asked for one. Never waits for a reviewer. Never merges unless told. Use when the user says "ship", "create the PR", "push and create the PR", "commit and push", "ship as a stack", "watch the CI" or "CI errored".
 argument-hint: "[issue number or extra context]"
 ---
 
@@ -10,7 +10,7 @@ argument-hint: "[issue number or extra context]"
 
 Own the work from the current working tree to a PR with green CI. The user merges.
 
-Stop at the step the request names. "Commit" stops after step 3. "Commit and push" or "push the changes" stops after the push in step 4, without opening a PR. "Watch the CI" or "CI errored" starts at step 5 on the existing PR. "Ship", "create the PR" or "push and create the PR" runs every step.
+Stop at the step the request names. "Commit" stops after step 3. "Commit and push" or "push the changes" stops after the push in step 4, without opening a PR. "Watch the CI" or "CI errored" starts at step 5 on the existing PR. "Ship", "create the PR" or "push and create the PR" runs every step. A request for a stack, or a layer plan from another skill, runs the steps as [Stack mode](#stack-mode) changes them.
 
 ## 1. Preflight
 
@@ -113,3 +113,26 @@ Ship is done when the required checks pass on the head commit. Before you stop, 
 Call `unwatch_pull_request` before you stop, also when you stop to ask the user something. Report the PR link, the head commit, the check results, what you fixed along the way, and any follow-ups you declined.
 
 Never merge, enable auto-merge or push to the base branch unless the user asked for it in this session. When asked to merge, run `git fetch`, confirm the PR is still green and not behind, and use the merge method the repo uses. Never bypass branch protection.
+
+## Stack mode
+
+A stack is a chain of PRs in which each one builds on the one below. The `gh stack` extension creates and updates it. Use this mode when the user asks for a stack, or when a skill hands over a layer plan. A layer plan names each layer from the bottom up: the branch name, its last commit, the PR title and what the body should say. With no plan, propose one and ask before you create branches.
+
+The commits must already be in layer order on the current branch, so that each layer ends at one commit. If they are not, stop and ask, because reordering them rewrites history.
+
+Steps 1 to 3 run as written, with one branch name per layer in the form from step 1. These steps replace step 4:
+
+1. Create each layer's branch at its last commit with `git branch <name> <commit>`. The working branch stays local and is never pushed.
+2. Run `gh stack init --base <base> <bottom> ... <top>`. It adopts the branches as a stack.
+3. If the base has moved since the branch left it, run `gh stack rebase`.
+4. Run `gh stack submit --auto --open`. It pushes every branch and opens one PR per layer, each based on the layer below. `--auto` skips the interactive editor. `--open` makes the PRs ready for review, so review bots run.
+5. Set each PR's title and body with `gh pr edit <n> --title <title> --body-file <file>`, in the body format of step 4.
+6. In T3 Code, link every PR to the thread.
+
+Steps 5 to 7 run for every PR in the stack, with these differences:
+
+- **A fix.** Put it in the lowest layer it applies to. Check out that branch, commit, run `gh stack rebase --upstack` to carry the fix into the layers above, then `gh stack push`. This rebases and force-pushes with a lease. It is allowed only on the branches of a stack.
+- **Base moved, conflict, or a lower layer merged.** Run `gh stack sync` in place of the `sync-base` skill. On a rebase conflict it restores the branches and stops. Then run `gh stack rebase`, resolve each conflict by the rules in step 3 of `sync-base`, and run `gh stack rebase --continue`.
+- **Stop.** Ship is done when the required checks pass on the head commit of every layer. Report every PR link, bottom to top.
+
+Never run `gh stack merge` unless the user asked for it in this session.
