@@ -101,6 +101,7 @@ mutation($threadId: ID!) {
 
 - **Failed check.** Read the failed log with `gh run view <run-id> --log-failed`. Decide whether it is a real failure or an infrastructure flake. Fix real failures, run the checks from step 2, commit and push. Re-run a flake once with `gh run rerun <run-id> --failed`; if it fails again, treat it as real.
 - **Conflict or branch behind.** Use the `sync-base` skill, run the checks, and push.
+- **Comment from `amedia-idp`.** Ignore it and do not reply. The bot posts deploy information, not review findings. Its login is `amedia-idp` in GraphQL and `gh pr view`, and `amedia-idp[bot]` in the REST API.
 - **Review comment from a bot.** Verify the finding against the code. Fix it when it is real. When it is not, or when it asks for work outside the PR's goal, reply with a one-line reason and resolve the thread.
 - **Review comment from a person.** Verify it against the code. Fix it when it is real. Before posting any reply, show the user the draft and post only after approval.
 
@@ -132,7 +133,7 @@ Steps 1 to 3 run as written, with one branch name per layer in the form from ste
 Steps 5 to 7 run for every PR in the stack, with these differences:
 
 - **A fix.** Put it in the lowest layer it applies to. Check out that branch, commit, run `gh stack rebase --upstack` to carry the fix into the layers above, then `gh stack push`. This rebases and force-pushes with a lease. It is allowed only on the branches of a stack.
-- **Base moved, conflict, or a lower layer merged.** Run `gh stack sync` in place of the `sync-base` skill. On a rebase conflict it restores the branches and stops. Then run `gh stack rebase`, resolve each conflict by the rules in step 3 of `sync-base`, and run `gh stack rebase --continue`.
+- **Base moved, conflict, or a lower layer merged.** Run `gh stack sync` in place of the `sync-base` skill. On a rebase conflict it restores the branches and stops. Then run `gh stack rebase`, resolve each conflict by the rules in step 3 of `sync-base`, stage the files, and run `GIT_EDITOR=true gh stack rebase --continue` so that no editor opens. Finish with `gh stack push`.
 - **Stop.** Ship is done when the required checks pass on the head commit of every layer. Report every PR link, bottom to top.
 
 Never run `gh stack merge` unless the user asked for it in this session.
