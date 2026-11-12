@@ -127,6 +127,7 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 
 - The target is the newest release of the active LTS line from the survey.
 - Update every place from the survey and keep the form each place already uses, such as `26`, `>=26` or `26.13.1`. Amedia's CI installs the version in `engines.node` and fails or warns when the major in the Dockerfile's final `FROM` differs.
+- When the `package.json` next to the lockfile has no `engines.node`, add it with the target as an exact version, such as `26.13.1`. Add it also when a file such as `.node-version` sets the version, because Amedia's `node/setup` action fails without `engines.node`. A package published to a registry, one without `"private": true`, gets `>=<major>` instead, because an exact version makes npm warn every consumer on another release.
 - In a Dockerfile, keep the registry and the image variant and change only the version. Confirm that the tag exists in its registry before you write it.
 - Set `@types/node` to the newest version with the same major as Node.
 - Commit.
