@@ -13,7 +13,7 @@ Do the whole job in one run and stop at the summary. The user picks the PR shape
 - Never push the audited repo or open a PR in it before the user has picked the PR shape. The one PR this skill opens on its own is the one against `amedia/renovate` in step 5.
 - Steps 3 and 5 run only in an Amedia repo, one whose `origin` remote is in the `amedia` GitHub org. In any other repo, skip them and say so in the summary.
 - The reference file for the package manager holds the commands. The repo pins its own package manager version, so check a command against its `--help` in the repo when it fails or behaves differently.
-- A dependency version is always written exact, as `1.2.3`. No `^`, no `~`, no range. `peerDependencies` are the exception and keep their ranges.
+- A dependency version is always written exact, as `1.2.3`. No `^`, no `~`, no range. `peerDependencies` are the exception and keep a range, as step 6 describes.
 
 ## 1. Survey
 
@@ -119,7 +119,8 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 
 - Apply the settings from the reference file.
 - Write every entry in `dependencies`, `devDependencies` and `optionalDependencies` as the exact version the lockfile resolves today. Do not strip the `^` or `~` from the range. That gives the lowest version the range allows, which can be older than the installed one.
-- Leave `peerDependencies` and entries that are not registry versions as they are: `workspace:`, `catalog:`, `file:`, `link:`, git and URL entries.
+- Leave entries that are not registry versions as they are: `workspace:`, `catalog:`, `file:`, `link:`, git and URL entries.
+- In a package published to a registry, one without `"private": true`, raise the lower bound of each peer dependency to the version the lockfile resolves today, written as a caret range such as `^6.4.0`. A bare `^6` promises `6.0.0` works, but the package's own tests only ran against the resolved version. Leave a range when its lower bound is already at or above that version, when it allows more than one major, such as `^5 || ^6`, or when the resolved version falls outside it. Report the last case.
 - Update the lockfile without installing. Its resolved versions must not change in this commit.
 - Commit.
 
@@ -202,6 +203,7 @@ Report in this order:
 - The audit counts before and after, as a table with info, low, moderate, high and critical.
 - Each advisory that is left, with the reason it could not be fixed.
 - Each updated package as `{name}: {old} -> {new}`, under `dependencies` and `devDependencies`.
+- Each raised peer dependency range as `{name}: {old} -> {new}`. Consumers on an older version of that peer must update it, so the release notes of the next version should say so.
 - Node: the version before and after, and each file that changed.
 - Workflows: each action as `{name}: {old} -> {new}`, and each major not taken with its reason. The actions kept at an allowlisted ref, the blocked actions with their forks, and the deprecated `amedia/github-workflows` references with their replacements. Outside Amedia, say that nothing updates the pins until the repo runs Renovate or Dependabot.
 - Whoami: what changed, and any problem left. Say that `apptool who info` shows the result only after the merge.
