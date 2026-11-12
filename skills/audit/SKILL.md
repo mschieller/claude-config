@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, pins every version, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerabilities". For a security review of code, use security-review.
+description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, removes overrides nothing needs any more, pins versions, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerabilities". For a security review of code, use security-review.
 ---
 
 # Audit
@@ -13,7 +13,29 @@ Do the whole job in one run and stop at the summary. The user picks the PR shape
 - Never push the audited repo or open a PR in it before the user has picked the PR shape. The one PR this skill opens on its own is the one against `amedia/renovate` in step 5.
 - Steps 3 and 5 run only in an Amedia repo, one whose `origin` remote is in the `amedia` GitHub org. In any other repo, skip them and say so in the summary.
 - The reference file for the package manager holds the commands. The repo pins its own package manager version, so check a command against its `--help` in the repo when it fails or behaves differently.
-- A dependency version is always written exact, as `1.2.3`. No `^`, no `~`, no range. `peerDependencies` are the exception and keep their ranges.
+- A dependency version is written exact, as `1.2.3`, with no `^`, `~` or range. Two kinds of entry keep a range, as steps 6, 9 and 10 describe: every `peerDependencies` entry, and the `dependencies` and `optionalDependencies` of a published package. A consumer of a published package resolves those itself, and an exact version there forces a second copy on every consumer that has another version.
+- When the repo has a `.changeset` folder, a commit that changes what a released package ships adds its changeset, as [Changesets](#changesets) describes.
+
+## Changesets
+
+A released package is one the release tool versions:
+
+- With Changesets, a package without `"private": true` that is not in `ignore` in `.changeset/config.json`, and a private package when `privatePackages` in that file says so. Changesets 2 versions private packages unless `privatePackages` is `false` or sets `version: false`. Changesets 3 versions them only when `privatePackages` is `true` or sets `version: true`.
+- With `pnpm change`, every package. It does not read `.changeset/config.json`.
+
+A commit needs a changeset for each released package whose `package.json` it changes in `dependencies`, `optionalDependencies`, `peerDependencies` or `engines.node`, or whose `catalog:` entry in one of those fields it changes in `pnpm-workspace.yaml`. The bump is a patch for a dependency update or pin and for a changed `engines.node` in an app, and a minor for a raised or widened peer range or an `engines.node` added to a published package. When a package gets both in one commit, take the minor. A released app also gets a patch changeset when the commit fixes an advisory in what the app installs through the lockfile or an override alone, because the app ships what its lockfile resolves. Every other change to `devDependencies`, overrides, settings, the lockfile, workflows, Dockerfiles, whoami, code owners and Renovate needs none. A published package gets none for the lockfile or an override, because its consumers resolve their own versions.
+
+Write the changeset as a file in `.changeset/`, in the commit it describes, so a stack keeps it with its layer. Any name ending in `.md` works except `README.md`. Changesets and `pnpm change` read the same format:
+
+```markdown
+---
+"<package>": patch
+---
+
+<what changed for consumers, such as "Update fastify to 5.6.1">
+```
+
+The summary of a raised peer range says that consumers on an older version of that peer must update it, and names the advisory when one caused it. Check the release plan with `npx changeset status` or `pnpm change status`. When CI fails a PR without a changeset, give each layer without one a changeset that releases nothing: `npx changeset add --empty`, or `pnpm change <package> --bump none --summary <text>`.
 
 ## 1. Survey
 
@@ -22,11 +44,14 @@ Change nothing in this step.
 - Run `git status --short`. If the tree has uncommitted changes, add that to the questions in step 2. If the current branch is the default branch, create `chore/audit` from it.
 - Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 6, 9 and 10 and say so in the summary.
 - List every `package.json` in the repo and whether the repo is a workspace.
+- Decide which packages are published. A package is published when it has no `"private": true` and either the registry has it or the repo publishes it. The registry has it when `npm view <name> name` succeeds and either the name is scoped, such as `@scope/name`, or `npm view <name> repository.url` names this repo. An unscoped name can belong to someone else's package, as `app` and `server` do. A restricted package needs the user's npm login, and without it `npm view` answers 404. The repo publishes it when a workflow or script runs `npm publish`, `pnpm publish` or `changeset publish`, or the package has a `publishConfig`. Every other package is an app.
 - Run the frozen install.
 - Record the audit counts for info, low, moderate, high and critical. These are the "before" numbers in the summary.
 - Record the outdated packages, split into those with a newer patch or minor and those with a newer major.
+- List every override in the places the reference file names. Find why each one was added, from a comment next to it or from the commit that added it and that commit's PR. `git log -S'<name>' --reverse -- <file>` lists the commits that changed the name, oldest first. Record the reason as a fix, when the forced version fixes an advisory or a bug, or as a hold-back, when a newer version broke the repo. Record it as unknown when nothing says.
 - Find every place that sets a Node version: `engines.node`, `.node-version`, `.nvmrc`, `.tool-versions`, `volta`, `node-version` inputs in workflows, every `FROM` in a Dockerfile, `@types/node` and a `@tsconfig/node<major>` base.
-- Find the active LTS line of Node. In `https://raw.githubusercontent.com/nodejs/Release/main/schedule.json` it is the line whose `lts` date has passed and whose `maintenance` date has not. Its newest release is the first entry in `https://nodejs.org/dist/index.json` whose `lts` field holds that line's codename.
+- Find the active LTS line of Node. In `https://raw.githubusercontent.com/nodejs/Release/main/schedule.json` it is the line whose `lts` date has passed and whose `maintenance` date has not. Its newest release is the first entry in `https://nodejs.org/dist/index.json` whose `lts` field holds that line's codename. Also find the oldest supported line, the oldest one with an `lts` date whose `end` date has not passed.
+- When the repo has a `.changeset` folder, find the release tool, `@changesets/cli` and its major in `devDependencies` or pnpm's own `pnpm change`, and with Changesets read `ignore` and `privatePackages` from `.changeset/config.json`. Check the CI workflows for a step that fails a PR without a changeset.
 - In an Amedia repo, run `apptool who info` and read the validation problems from its plain output. The `--json` output leaves them out. Find every whoami file with the glob `**/whoami*.yaml`, and compare the `owner` in each with the owner ids in `apptool who owners --json`.
 - Look for a `CODEOWNERS` file in `.github/`, at the root and in `docs/`, the three places GitHub reads. When there is none, collect candidates for the question in step 2: the user's own login from `gh api user`, and in an org repo the user's teams from `gh api user/teams`, filtered to that org and to the teams that pass the access check in step 4.
 - In an Amedia repo, record four facts about Renovate:
@@ -44,6 +69,7 @@ Ask everything the survey raised in one round with AskUserQuestion, with the rec
 - A whoami owner that is not the `id` of any owner in `apptool who owners --json`. Offer the closest owner ids, and recommend the one whose `aliases` or `name` hold the current value or resemble it. Recommend none when nothing resembles it.
 - The section of `config/renovate-config.js` the repo belongs under, when no section comment in that file appears in the owner's `id`, `name` or `aliases`, ignoring case. Offer the section comments.
 - A missing `CODEOWNERS` file. Ask whether to add one. If yes, ask who owns the code: one owner for everything, or different owners for different paths, and which teams or people. Offer the candidates from the survey and let the user name others. Recommend one team for `*` when the user is in a team with access to the repo.
+- An override with an unknown reason. Offer to treat it as a fix, which step 9 removes when nothing needs it, or as a hold-back, which step 9 keeps. Recommend a fix. The baseline scripts in step 9 catch many wrong removals, while a wrongly kept override stays until someone checks it by hand.
 - Tests that fail before any change. Offer to continue with those failures noted, or to stop.
 - Uncommitted changes in the tree.
 
@@ -100,7 +126,29 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 
   `helpers:pinGitHubActionDigests` keeps the SHA pins from step 8 current. Without the package rule it also pins `@master` to a SHA, and fixes in `amedia/github-workflows` stop reaching the repo.
 
-- If it has one, check that it extends `github>amedia/renovate` or presets from that repo, and that it has `:pinAllExceptPeerDependencies`, `helpers:pinGitHubActionDigests` and the package rule above. The shared preset pins only dev dependencies and no action digests. Add what is missing and keep the rest.
+- When the survey found published packages, add a second package rule that names the `package.json` of each one. Without it `:pinAllExceptPeerDependencies` pins their `dependencies`:
+
+  ```json5
+  {
+    "description": "Published packages keep ranges in dependencies, so consumers can share one copy",
+    "matchFileNames": ["packages/<name>/package.json"],
+    "matchDepTypes": ["dependencies", "optionalDependencies"],
+    "rangeStrategy": "auto"
+  }
+  ```
+
+- When a published package uses a pnpm catalog entry in `peerDependencies`, `dependencies` or `optionalDependencies`, add a third rule that names each such entry. Renovate reads a catalog entry from `pnpm-workspace.yaml`, so the rule above does not match it:
+
+  ```json5
+  {
+    "description": "Catalog entries that a published package ships keep their ranges",
+    "matchFileNames": ["pnpm-workspace.yaml"],
+    "matchDepNames": ["<name>"],
+    "rangeStrategy": "auto"
+  }
+  ```
+
+- If it has one, check that it extends `github>amedia/renovate` or presets from that repo, and that it has `:pinAllExceptPeerDependencies`, `helpers:pinGitHubActionDigests` and the package rules above. The shared preset pins only dev dependencies and no action digests. Add what is missing and keep the rest.
 - Delete the Dependabot config, and delete the workflows and steps that only act for `dependabot[bot]`. Leave Dependabot alerts on. They are a repo setting, not a file.
 - Commit, then dry-run from the repo root. Renovate ignores an untracked config file.
 
@@ -108,7 +156,7 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
   GITHUB_COM_TOKEN=$(gh auth token) LOG_LEVEL=debug npx --yes renovate --platform=local > <scratchpad>/renovate.log 2>&1
   ```
 
-  The run is good when the log says `Config file exists` for the config, has no line about an onboarding branch, and ends `Dependency extraction complete` with counts that cover the package files, the Dockerfiles and the workflows. No update for an `amedia/` or `amedia-actions/` dependency in the log may have a `newDigest`. Collect every `Failed to look up` line for the summary. A private package fails here because the local run has no registry login. The local run only looks up versions. It does not simulate branches or PRs.
+  The run is good when the log says `Config file exists` for the config, has no line about an onboarding branch, and ends `Dependency extraction complete` with counts that cover the package files, the Dockerfiles and the workflows. No update for an `amedia/` or `amedia-actions/` dependency in the log may have a `newDigest`. No update with `"isPin": true` may belong to a `peerDependencies` entry, to `dependencies` or `optionalDependencies` of a published package, or to a catalog entry named in the third rule. Collect every `Failed to look up` line for the summary. A private package fails here because the local run has no registry login. The local run only looks up versions. It does not simulate branches or PRs.
 - If `config/renovate-config.js` does not list the repo, open a PR that adds it. Clone `amedia/renovate` into the scratchpad, branch, add `"amedia/<repo>",` as the last line of the block under the section comment that matches the owner, or the one chosen in step 2, and follow that repo's commit and PR title convention. Run `node --check config/renovate-config.js` before you push, because that repo's CI does. Open one PR per audited repo. In T3 Code, link the PR to the thread. Do not watch or merge it.
 - Leave an open onboarding PR from the bot alone and name it in the summary. The config from this run replaces it.
 - The shared preset takes the reviewers of Renovate's PRs from `CODEOWNERS`. When the repo has no such file after step 4, say in the summary that Renovate's PRs get no reviewers.
@@ -116,17 +164,23 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 ## 6. Pin and settings
 
 - Apply the settings from the reference file.
-- Write every entry in `dependencies`, `devDependencies` and `optionalDependencies` as the exact version the lockfile resolves today. Do not strip the `^` or `~` from the range. That gives the lowest version the range allows, which can be older than the installed one.
-- Leave `peerDependencies` and entries that are not registry versions as they are: `workspace:`, `catalog:`, `file:`, `link:`, git and URL entries.
+- Write every `devDependencies` entry as the exact version the lockfile resolves today, and in an app every `dependencies` and `optionalDependencies` entry too. Do not strip the `^` or `~` from the range. That gives the lowest version the range allows, which can be older than the installed one.
+- In a published package, leave `dependencies` and `optionalDependencies` as they are.
+- Leave entries that are not registry versions as they are: `workspace:`, `catalog:`, `file:`, `link:`, git and URL entries.
+- Leave `peerDependencies` as they are, also for a package that `devDependencies` lists too. The next two bullets give the one exception.
+- In a published package from the survey, raise the lower bound of a peer dependency range when two things hold. The range covers exactly one whole major, 1 or higher, such as `^6`, `6.x`, `^6.0.0` or `>=6 <7`. And `devDependencies` lists the same package. Write the version that entry resolves to today as a caret range, such as `^6.4.0`. A bare `^6` promises that `6.0.0` works, but the package's own tests only ran against the `devDependencies` version.
+- Leave every other peer range, so that no upper bound moves and later audits do not raise it again: a range below major 1, a tilde range, and a range that allows more than one major, such as `^5 || ^6` or `>=6`. Leave a peer that `devDependencies` does not list, because the lockfile then holds whichever release the package manager picked. Leave a range that the resolved version falls outside, and report it.
 - Update the lockfile without installing. Its resolved versions must not change in this commit.
 - Commit.
 
 ## 7. Node
 
 - The target is the newest release of the active LTS line from the survey.
-- Update every place from the survey and keep the form each place already uses, such as `26`, `>=26` or `26.13.1`. Amedia's CI installs the version in `engines.node` and fails or warns when the major in the Dockerfile's final `FROM` differs.
+- Update every place from the survey and keep the form each place already uses, such as `26`, `>=26` or `26.13.1`. The exception is `engines.node` in a published package, which this step never raises. Amedia's CI installs the version in `engines.node` and fails or warns when the major in the Dockerfile's final `FROM` differs.
+- When the `package.json` next to the lockfile belongs to an app and has no `engines.node`, add it with the target as an exact version, such as `26.13.1`. Add it also when a file such as `.node-version` sets the version, because Amedia's `node/setup` action fails without `engines.node`.
+- In a published package, `engines.node` is the oldest Node its consumers may run, not the Node it builds with. When it is missing, add it as `>=<major>` of the oldest supported line from the survey. When its lower bound names a line past its end date, leave it and report it as a candidate for a major release.
 - In a Dockerfile, keep the registry and the image variant and change only the version. Confirm that the tag exists in its registry before you write it.
-- Set `@types/node` to the newest version with the same major as Node.
+- Set `@types/node` to the newest version with the same major as Node. In a published package, `@types/node` and a `@tsconfig/node<major>` base follow the major of the lower bound in its `engines.node` instead. Types and a compile target for a newer Node let code through that the oldest supported Node cannot run.
 - Commit.
 
 ## 8. Workflows
@@ -155,13 +209,27 @@ Commit when done.
 
 ## 9. Updates and fixes
 
-Work in this order and stop as soon as the audit is clean and nothing is outdated within its major.
+Work through these in order and stop as soon as the audit is clean and nothing is outdated within its major.
 
 1. Run the audit fix that updates the lockfile.
 2. Move each direct dependency to the newest patch or minor of its current major.
 3. For each advisory that is left, find which direct dependency pulls the package in, and update that dependency.
 4. Add an override only when no update removes the advisory. Record the package, the version and the advisory id for the summary.
-5. Remove existing overrides that no advisory needs any more. Check by removing one and running the audit again.
+
+Items 2 and 3 move only the entry in `dependencies`, `devDependencies` or `optionalDependencies`. A `peerDependencies` entry for the same package keeps its range and changes only by the rule in step 6, the advisory rule below and the rule in step 10.
+
+In a published package, a `dependencies` or `optionalDependencies` entry keeps its range. An update inside the range changes only the lockfile. When an advisory covers a version the range allows, raise the lower bound to the fixed version and keep the operator, so `^4.3.0` becomes `^4.4.4`. Consumers then cannot resolve the vulnerable version.
+
+The same holds for a `peerDependencies` range of a published package when the advisory is in the peer itself. The first version that fixes it becomes the lower bound, so `^6.1.0` becomes `^6.4.3`, whatever form the range has. In a range that allows several majors, raise each part that allows a version the advisory covers. Leave a major that has no fixed version, and report it. Step 10 then widens the range by the major that has the fix.
+
+Then check each override from the survey, also when the audit was clean from the start. Overrides from item 4 stay.
+
+- Remove an override outside the root `package.json` and the root `pnpm-workspace.yaml`. npm and pnpm ignore it.
+- Remove an override for a package that nothing in the tree depends on any more.
+- When the audit reports the version an override forces, raise the override to the lowest version that fixes the advisory. Updating the parent cannot fix that.
+- Remove each other override, update the lockfile without installing, and compare the versions the package resolves to with and without it. Keep the override when a version drops or the audit reports a new advisory.
+- Otherwise remove a fix and keep a hold-back, by the reason from the survey or the answer from step 2. An unchanged version does not show that a hold-back is no longer needed, because the lockfile keeps any version the parent's range allows until the next update.
+- Run the install after the removals, then the baseline scripts. The lockfile-only update leaves `node_modules` on the overridden versions. When a script that passed now fails, put the removed overrides back one at a time until it passes, and keep the last one you put back.
 
 Commit when done.
 
@@ -174,11 +242,21 @@ For each major an advisory needs:
 - Take the version the registry tags `latest`. Skip it when it has a prerelease suffix such as `-rc`, `-beta` or `-alpha`.
 - Read the changelog or migration guide from the current version to that one. Search the repo for each API it removes or changes.
 - When nothing the repo uses breaks, or the needed changes are small and clear, upgrade and run the tests. Commit each major on its own.
+- In `dependencies` or `optionalDependencies` of a published package, write the new version with the operator the entry has, such as `^5.1.0`.
+- When the upgraded package is also a peer dependency of a published package, widen the peer range by the new major and change nothing else in it. Add a caret range with the version the lockfile resolves, the one the tests now run against: `^6.4.0` becomes `^6.4.0 || ^7.2.1`. The old major stays allowed although it has no fix, so that consumers can move on their own schedule. Record it for the summary.
 - When the tests fail and the fix is not small, or you are not confident, undo the upgrade and record the package, the target version and the reason.
 
 ## 11. Verify
 
 - Run every script from the survey's baseline again. A script that passed before must pass now.
+- Compare the `peerDependencies` of each `package.json` with the merge base. The command prints nothing when they match:
+
+  ```
+  diff <(git show "<merge-base>:<path>" 2>/dev/null | jq -S '.peerDependencies // {}') <(jq -S '.peerDependencies // {}' "<path>")
+  ```
+
+  The only changes allowed are a lower bound raised by step 6 or for an advisory in step 9, and a range widened by step 10. Every entry must still be a range. Revert any other change in the commit that made it, and report it.
+- Run the same comparison on `.dependencies` and `.optionalDependencies` of each published package. No entry may have lost its range.
 - When a Dockerfile changed and Docker is available, build the image.
 - When a workflow changed and `actionlint` is installed, run it. When it is not installed, skip it and leave it out of the summary.
 - Trace each new failure to its commit. Fix it there, or revert that commit and record why.
@@ -191,13 +269,17 @@ Report in this order:
 - The audit counts before and after, as a table with info, low, moderate, high and critical.
 - Each advisory that is left, with the reason it could not be fixed.
 - Each updated package as `{name}: {old} -> {new}`, under `dependencies` and `devDependencies`.
+- Each raised or widened peer dependency range as `{name}: {old} -> {new}`, and each peer major that stays allowed without a fix for an advisory.
+- Each catalog entry left as a range because a published package uses it.
+- Each changeset added, with its packages and bumps.
+- Each package without a `private` field that the audit treated as an app.
 - Node: the version before and after, and each file that changed.
 - Workflows: each action as `{name}: {old} -> {new}`, and each major not taken with its reason. The actions kept at an allowlisted ref, the blocked actions with their forks, and the deprecated `amedia/github-workflows` references with their replacements. Outside Amedia, say that nothing updates the pins until the repo runs Renovate or Dependabot.
 - Whoami: what changed, and any problem left. Say that `apptool who info` shows the result only after the merge.
 - Code owners: the file added and its owners, or that the repo already had one, or that the user declined. The command that checks the file after the push.
 - Renovate: added, updated or already correct. The dry-run result and the failed lookups. The URL of the `amedia/renovate` PR, and that it should merge after the repo's own PR, because the bot opens an onboarding PR in a listed repo that has no config. Any open onboarding PR.
 - Majors: each one done, and each one not done with its reason.
-- Overrides added and removed.
+- Overrides added, raised and removed, and each one kept with its reason.
 - What the user must test by hand because this run could not.
 - Each choice made without asking.
 - The PR shape recommendation from step 13.
