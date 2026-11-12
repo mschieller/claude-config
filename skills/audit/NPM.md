@@ -26,12 +26,13 @@ It makes `npm install <name>` write the version without a range.
 | Update the lockfile without installing | `npm install --package-lock-only` |
 
 - Never run `npm audit fix --force`. It applies major upgrades without the check in step 10 of the skill.
-- `npm install <name>@<version>` keeps the dependency in its group.
+- `npm install <name>@<version>` keeps the dependency in its group and leaves a `peerDependencies` entry for the same package as it is. That entry changes only by the rules in steps 6, 9 and 10 of the skill.
+- With `save-exact`, `npm install <name>@<version>` replaces a range with the exact version. For an entry that keeps its range, run `npm update <name>` for an update inside the range, and edit the range by hand otherwise.
 - If the repo's CI installs with `--ignore-scripts`, pass it to `npm ci` and `npm install` too.
 
 ## Pin
 
-Take each version from `npm ls --package-lock-only --json --depth=0` and write it into `package.json`. Run `npm install --package-lock-only`. In `git diff package-lock.json`, only the ranges in the root package entry may change.
+Take each version from `npm ls --package-lock-only --json --depth=0` and write it into the entries of `package.json` that step 6 of the skill pins. Run `npm install --package-lock-only`. In `git diff package-lock.json`, only the ranges in the root package entry may change.
 
 ## Overrides
 
