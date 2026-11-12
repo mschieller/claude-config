@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, pins every version, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerabilities". For a security review of code, use security-review.
+description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, removes overrides nothing needs any more, pins every version, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerabilities". For a security review of code, use security-review.
 ---
 
 # Audit
@@ -25,6 +25,7 @@ Change nothing in this step.
 - Run the frozen install.
 - Record the audit counts for info, low, moderate, high and critical. These are the "before" numbers in the summary.
 - Record the outdated packages, split into those with a newer patch or minor and those with a newer major.
+- List every override in the places the reference file names. Find why each one was added, from a comment next to it or from the commit that added it and that commit's PR. `git log -S'<name>' --reverse -- <file>` lists the commits that changed the name, oldest first. Record the reason as a fix, when the forced version fixes an advisory or a bug, or as a hold-back, when a newer version broke the repo. Record it as unknown when nothing says.
 - Find every place that sets a Node version: `engines.node`, `.node-version`, `.nvmrc`, `.tool-versions`, `volta`, `node-version` inputs in workflows, every `FROM` in a Dockerfile, `@types/node` and a `@tsconfig/node<major>` base.
 - Find the active LTS line of Node. In `https://raw.githubusercontent.com/nodejs/Release/main/schedule.json` it is the line whose `lts` date has passed and whose `maintenance` date has not. Its newest release is the first entry in `https://nodejs.org/dist/index.json` whose `lts` field holds that line's codename.
 - In an Amedia repo, run `apptool who info` and read the validation problems from its plain output. The `--json` output leaves them out. Find every whoami file with the glob `**/whoami*.yaml`, and compare the `owner` in each with the owner ids in `apptool who owners --json`.
@@ -44,6 +45,7 @@ Ask everything the survey raised in one round with AskUserQuestion, with the rec
 - A whoami owner that is not the `id` of any owner in `apptool who owners --json`. Offer the closest owner ids, and recommend the one whose `aliases` or `name` hold the current value or resemble it. Recommend none when nothing resembles it.
 - The section of `config/renovate-config.js` the repo belongs under, when no section comment in that file appears in the owner's `id`, `name` or `aliases`, ignoring case. Offer the section comments.
 - A missing `CODEOWNERS` file. Ask whether to add one. If yes, ask who owns the code: one owner for everything, or different owners for different paths, and which teams or people. Offer the candidates from the survey and let the user name others. Recommend one team for `*` when the user is in a team with access to the repo.
+- An override with an unknown reason. Offer to treat it as a fix, which step 9 removes when nothing needs it, or as a hold-back, which step 9 keeps. Recommend a fix. The baseline scripts in step 9 catch many wrong removals, while a wrongly kept override stays until someone checks it by hand.
 - Tests that fail before any change. Offer to continue with those failures noted, or to stop.
 - Uncommitted changes in the tree.
 
@@ -155,13 +157,21 @@ Commit when done.
 
 ## 9. Updates and fixes
 
-Work in this order and stop as soon as the audit is clean and nothing is outdated within its major.
+Work through these in order and stop as soon as the audit is clean and nothing is outdated within its major.
 
 1. Run the audit fix that updates the lockfile.
 2. Move each direct dependency to the newest patch or minor of its current major.
 3. For each advisory that is left, find which direct dependency pulls the package in, and update that dependency.
 4. Add an override only when no update removes the advisory. Record the package, the version and the advisory id for the summary.
-5. Remove existing overrides that no advisory needs any more. Check by removing one and running the audit again.
+
+Then check each override from the survey, also when the audit was clean from the start. Overrides from item 4 stay.
+
+- Remove an override outside the root `package.json` and the root `pnpm-workspace.yaml`. npm and pnpm ignore it.
+- Remove an override for a package that nothing in the tree depends on any more.
+- When the audit reports the version an override forces, raise the override to the lowest version that fixes the advisory. Updating the parent cannot fix that.
+- Remove each other override, update the lockfile without installing, and compare the versions the package resolves to with and without it. Keep the override when a version drops or the audit reports a new advisory.
+- Otherwise remove a fix and keep a hold-back, by the reason from the survey or the answer from step 2. An unchanged version does not show that a hold-back is no longer needed, because the lockfile keeps any version the parent's range allows until the next update.
+- Run the baseline scripts after the removals. When one that passed now fails, put the removed overrides back one at a time until it passes, and keep the last one you put back.
 
 Commit when done.
 
@@ -197,7 +207,7 @@ Report in this order:
 - Code owners: the file added and its owners, or that the repo already had one, or that the user declined. The command that checks the file after the push.
 - Renovate: added, updated or already correct. The dry-run result and the failed lookups. The URL of the `amedia/renovate` PR, and that it should merge after the repo's own PR, because the bot opens an onboarding PR in a listed repo that has no config. Any open onboarding PR.
 - Majors: each one done, and each one not done with its reason.
-- Overrides added and removed.
+- Overrides added, raised and removed, and each one kept with its reason.
 - What the user must test by hand because this run could not.
 - Each choice made without asking.
 - The PR shape recommendation from step 13.

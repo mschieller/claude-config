@@ -37,7 +37,9 @@ Take each version from `pnpm ls --json --depth 0` and write it into `package.jso
 
 ## Overrides
 
-Overrides are under `overrides` in `pnpm-workspace.yaml`, or under `pnpm.overrides` in `package.json` in repos on an older pnpm. Check both places.
+Overrides are under `overrides` in `pnpm-workspace.yaml`, or under `pnpm.overrides` in `package.json` in repos on an older pnpm. Check both places, and the `package.json` of each workspace package too. pnpm ignores `pnpm.overrides` outside the root without a warning.
+
+`pnpm why <name>` lists each version of the package in the lockfile and what pulls it in.
 
 ## Package manager version
 

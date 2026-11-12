@@ -35,4 +35,6 @@ Take each version from `npm ls --package-lock-only --json --depth=0` and write i
 
 ## Overrides
 
-Overrides are under `overrides` in `package.json`.
+Overrides are under `overrides` in `package.json`. Check the `package.json` of each workspace too. npm reads overrides only from the root and ignores the others without a warning.
+
+`npm ls <name> --package-lock-only --all` lists each version of the package in the lockfile and what pulls it in.
