@@ -28,7 +28,7 @@ minimumReleaseAge: 1440
 | What pulls a package in | `pnpm why <name>` |
 | Update the lockfile without installing | `pnpm install --lockfile-only` |
 
-- Bare `pnpm audit --fix` uses the `override` method and writes overrides. Use it only for step 8.4 of the skill.
+- Bare `pnpm audit --fix` uses the `override` method and writes overrides. Use it only for step 9.4 of the skill.
 - To move a direct dependency, edit its version in `package.json`, or in the catalog when the entry says `catalog:`, and run `pnpm install`. `pnpm add` and `pnpm update` keep a `^` or `~` that the entry already has, also with `saveExact` or `-E`.
 
 ## Pin
@@ -41,7 +41,7 @@ Overrides are under `overrides` in `pnpm-workspace.yaml`, or under `pnpm.overrid
 
 ## Package manager version
 
-`packageManager` in `package.json` names the pnpm version CI installs. Update it to the newest release of its current major. Treat a newer major like any other major in step 9 of the skill.
+`packageManager` in `package.json` names the pnpm version CI installs. Update it to the newest release of its current major. Treat a newer major like any other major in step 10 of the skill.
 
 ## Build scripts
 

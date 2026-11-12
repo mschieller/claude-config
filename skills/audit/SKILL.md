@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, pins every version, moves Node to the active LTS, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerabilities". For a security review of code, use security-review.
+description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, pins every version, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerabilities". For a security review of code, use security-review.
 ---
 
 # Audit
@@ -20,7 +20,7 @@ Do the whole job in one run and stop at the summary. The user picks the PR shape
 Change nothing in this step.
 
 - Run `git status --short`. If the tree has uncommitted changes, add that to the questions in step 2. If the current branch is the default branch, create `chore/audit` from it.
-- Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 6, 8 and 9 and say so in the summary.
+- Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 6, 9 and 10 and say so in the summary.
 - List every `package.json` in the repo and whether the repo is a workspace.
 - Run the frozen install.
 - Record the audit counts for info, low, moderate, high and critical. These are the "before" numbers in the summary.
@@ -34,7 +34,7 @@ Change nothing in this step.
   - whether a Dependabot config exists, and which workflows mention `dependabot`
   - whether `config/renovate-config.js` in `amedia/renovate` lists the repo
   - whether the bot has an open onboarding PR in the repo, titled "configure renovate"
-- Run every script in each `package.json` that tests, lints, typechecks or builds. Record what already fails. This is the baseline for step 10.
+- Run every script in each `package.json` that tests, lints, typechecks or builds. Record what already fails. This is the baseline for step 11.
 
 ## 2. Questions
 
@@ -82,11 +82,25 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
   ```json5
   {
     "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-    "extends": ["github>amedia/renovate", ":pinAllExceptPeerDependencies"]
+    "extends": [
+      "github>amedia/renovate",
+      ":pinAllExceptPeerDependencies",
+      "helpers:pinGitHubActionDigests"
+    ],
+    "packageRules": [
+      {
+        "description": "In-house actions run at @master or a tag, and amedia-actions fork tags never move",
+        "matchDepTypes": ["action", "workflow"],
+        "matchPackageNames": ["amedia/**", "amedia-actions/**"],
+        "pinDigests": false
+      }
+    ]
   }
   ```
 
-- If it has one, check that it extends `github>amedia/renovate` or presets from that repo, and that it has `:pinAllExceptPeerDependencies`. The shared preset pins only dev dependencies. Add what is missing and keep the rest.
+  `helpers:pinGitHubActionDigests` keeps the SHA pins from step 8 current. Without the package rule it also pins `@master` to a SHA, and fixes in `amedia/github-workflows` stop reaching the repo.
+
+- If it has one, check that it extends `github>amedia/renovate` or presets from that repo, and that it has `:pinAllExceptPeerDependencies`, `helpers:pinGitHubActionDigests` and the package rule above. The shared preset pins only dev dependencies and no action digests. Add what is missing and keep the rest.
 - Delete the Dependabot config, and delete the workflows and steps that only act for `dependabot[bot]`. Leave Dependabot alerts on. They are a repo setting, not a file.
 - Commit, then dry-run from the repo root. Renovate ignores an untracked config file.
 
@@ -94,7 +108,7 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
   GITHUB_COM_TOKEN=$(gh auth token) LOG_LEVEL=debug npx --yes renovate --platform=local > <scratchpad>/renovate.log 2>&1
   ```
 
-  The run is good when the log says `Config file exists` for the config, has no line about an onboarding branch, and ends `Dependency extraction complete` with counts that cover the package files, the Dockerfiles and the workflows. Collect every `Failed to look up` line for the summary. A private package fails here because the local run has no registry login. The local run only looks up versions. It does not simulate branches or PRs.
+  The run is good when the log says `Config file exists` for the config, has no line about an onboarding branch, and ends `Dependency extraction complete` with counts that cover the package files, the Dockerfiles and the workflows. No update for an `amedia/` or `amedia-actions/` dependency in the log may have a `newDigest`. Collect every `Failed to look up` line for the summary. A private package fails here because the local run has no registry login. The local run only looks up versions. It does not simulate branches or PRs.
 - If `config/renovate-config.js` does not list the repo, open a PR that adds it. Clone `amedia/renovate` into the scratchpad, branch, add `"amedia/<repo>",` as the last line of the block under the section comment that matches the owner, or the one chosen in step 2, and follow that repo's commit and PR title convention. Run `node --check config/renovate-config.js` before you push, because that repo's CI does. Open one PR per audited repo. In T3 Code, link the PR to the thread. Do not watch or merge it.
 - Leave an open onboarding PR from the bot alone and name it in the summary. The config from this run replaces it.
 - The shared preset takes the reviewers of Renovate's PRs from `CODEOWNERS`. When the repo has no such file after step 4, say in the summary that Renovate's PRs get no reviewers.
@@ -115,7 +129,31 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 - Set `@types/node` to the newest version with the same major as Node.
 - Commit.
 
-## 8. Updates and fixes
+## 8. Workflows
+
+This step covers every `uses:` in `.github/workflows/` and in the repo's own `action.yml` and `action.yaml` files. Skip local paths such as `./.github/actions/build` and `docker://` images.
+
+- An `amedia/` reference at a branch, such as `@master`, stays as it is. `amedia/github-workflows` has no versions and is called at `@master`, so its fixes reach every caller.
+- An `amedia/` reference at a tag moves to the repo's newest tag and stays a tag. List the tags with `gh api --paginate repos/<owner>/<repo>/tags --jq '.[].name' | sort -V`. Compare only version tags in the same form as the current ref, such as `v1.2.3` or `1.2.3`, and skip prerelease tags.
+- A deprecated `amedia/` reference keeps its ref, and is never swapped for its replacement. That changes inputs and behaviour, so it belongs in its own change. List each deprecated reference in the summary, with the replacement from the migration table in the `amedia/github-workflows` README.
+- In an Amedia repo, read the allowlist from `organization/main.tf` in `amedia/terraform-github` with `gh api`. It is `patterns_allowed` and the locals it joins, and `actions/*` and `github/*` are always allowed. An entry that names a ref, such as `owner/repo@v2` or `owner/repo@<sha>`, allows that exact ref and no other.
+- Sort each remaining reference in an Amedia repo:
+  - A fork under `amedia-actions` moves to its newest tag and stays a tag, found the same way as for an `amedia/` tag. fork-sync mirrors a tag only after 14 days and never moves it.
+  - A GitHub-owned action, or one a wildcard entry allows, gets pinned as described below.
+  - An action whose allowlist entry names a ref keeps that exact ref, because GitHub blocks any other. List it in the summary. Moving it needs a PR to `amedia/terraform-github`, and Renovate keeps opening PRs for it that fail until `ignore.json` in `amedia/renovate` disables it.
+  - Any other action is blocked in the org. Leave it, and list it in the summary with the `amedia-actions` fork that replaces it. When none exists, say that the Infrastructure team creates forks, and give how to request one from the actions limitations page on tech.api.no, found through Edda.
+- Outside Amedia, every action gets pinned.
+
+To pin an action:
+
+- Take the highest version among the releases at least 3 days old, the same wait as the shared Renovate preset. `gh api --paginate repos/<owner>/<repo>/releases` lists them with `published_at`, but not in version order, since a backport to an old major can come first. Skip drafts and prereleases. When the repo has no releases, take the highest version tag.
+- Resolve the tag with `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`. This endpoint follows an annotated tag to its commit.
+- Write the reference as `<owner>/<repo>/<path>@<full sha> # <tag>`, keeping the path when the reference has one, such as `/init` in `github/codeql-action/init`, and with the full tag such as `v4.2.1`. Renovate reads the comment as the current version.
+When a reference would move to a new major, whether a tag or a pin, read the release notes between the two versions. Compare the inputs the workflow passes and the outputs it reads with `action.yml` or `action.yaml` in the action's path at the new tag, fetched with `gh api -H 'Accept: application/vnd.github.raw' 'repos/<owner>/<repo>/contents/<path>/action.yml?ref=<tag>'`. For a reusable workflow, compare with its `on.workflow_call` block. Take the major when each one still exists with the same meaning. Otherwise take the newest version in the current major and record the major for the summary.
+
+Commit when done.
+
+## 9. Updates and fixes
 
 Work in this order and stop as soon as the audit is clean and nothing is outdated within its major.
 
@@ -127,7 +165,7 @@ Work in this order and stop as soon as the audit is clean and nothing is outdate
 
 Commit when done.
 
-## 9. Majors
+## 10. Majors
 
 Attempt a major upgrade only when an advisory cannot be fixed without it. For every other package with a newer major, write one line for the summary with what the major changes for this repo, and leave it for Renovate.
 
@@ -138,14 +176,15 @@ For each major an advisory needs:
 - When nothing the repo uses breaks, or the needed changes are small and clear, upgrade and run the tests. Commit each major on its own.
 - When the tests fail and the fix is not small, or you are not confident, undo the upgrade and record the package, the target version and the reason.
 
-## 10. Verify
+## 11. Verify
 
 - Run every script from the survey's baseline again. A script that passed before must pass now.
 - When a Dockerfile changed and Docker is available, build the image.
+- When a workflow changed and `actionlint` is installed, run it. When it is not installed, skip it and leave it out of the summary.
 - Trace each new failure to its commit. Fix it there, or revert that commit and record why.
 - Record the audit counts again. These are the "after" numbers.
 
-## 11. Summary
+## 12. Summary
 
 Report in this order:
 
@@ -153,6 +192,7 @@ Report in this order:
 - Each advisory that is left, with the reason it could not be fixed.
 - Each updated package as `{name}: {old} -> {new}`, under `dependencies` and `devDependencies`.
 - Node: the version before and after, and each file that changed.
+- Workflows: each action as `{name}: {old} -> {new}`, and each major not taken with its reason. The actions kept at an allowlisted ref, the blocked actions with their forks, and the deprecated `amedia/github-workflows` references with their replacements. Outside Amedia, say that nothing updates the pins until the repo runs Renovate or Dependabot.
 - Whoami: what changed, and any problem left. Say that `apptool who info` shows the result only after the merge.
 - Code owners: the file added and its owners, or that the repo already had one, or that the user declined. The command that checks the file after the push.
 - Renovate: added, updated or already correct. The dry-run result and the failed lookups. The URL of the `amedia/renovate` PR, and that it should merge after the repo's own PR, because the bot opens an onboarding PR in a listed repo that has no config. Any open onboarding PR.
@@ -160,9 +200,9 @@ Report in this order:
 - Overrides added and removed.
 - What the user must test by hand because this run could not.
 - Each choice made without asking.
-- The PR shape recommendation from step 12.
+- The PR shape recommendation from step 13.
 
-## 12. PR shape
+## 13. PR shape
 
 Count the change with `git diff --numstat <merge-base> HEAD`, leaving out lockfiles.
 
@@ -171,8 +211,9 @@ Recommend a single PR when no major upgrade needed source changes and the count 
 1. whoami, code owners and Renovate
 2. pin and settings
 3. Node
-4. updates and fixes
-5. one layer per major that changed source code
+4. workflows
+5. updates and fixes
+6. one layer per major that changed source code
 
 Fold a small layer into its neighbour. Say how many layers the stack has and why each one is separate.
 

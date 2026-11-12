@@ -25,7 +25,7 @@ It makes `npm install <name>` write the version without a range.
 | Move a direct dependency | `npm install <name>@<version>` |
 | Update the lockfile without installing | `npm install --package-lock-only` |
 
-- Never run `npm audit fix --force`. It applies major upgrades without the check in step 9 of the skill.
+- Never run `npm audit fix --force`. It applies major upgrades without the check in step 10 of the skill.
 - `npm install <name>@<version>` keeps the dependency in its group.
 - If the repo's CI installs with `--ignore-scripts`, pass it to `npm ci` and `npm install` too.
 
