@@ -11,7 +11,7 @@ Review with parallel reviewer agents, keep only findings the code supports, fix 
 ## 1. Parse the arguments
 
 - Scope. Nothing means the whole repo. `#123` or a PR URL means that PR's diff. `branch` means the diff from the merge base with the base branch to the working tree, including untracked files. `M2` or a milestone name means that milestone's issues against the code. A path means that folder. A Markdown file outside the code means review that document.
-- `max N` sets the number of reviewer agents. Default 6. The Explore agent that maps a large repo in step 2 does not count toward N.
+- `max N` sets the number of subagents. Default 6. The Explore agent that maps a large repo in step 2 counts toward N, so a run that uses it starts at most N minus 1 reviewers.
 - `report` turns off fixing. Only the report and the decisions are produced.
 - Other words are focus areas, such as "performance", "SQL", "caching" or "doc drift". They steer which reviewers run and what they look at.
 
@@ -19,7 +19,7 @@ Find the base branch with `gh repo view --json defaultBranchRef --jq .defaultBra
 
 Run `git status --porcelain --untracked-files=no` and note whether tracked files have uncommitted changes. Step 7 depends on it.
 
-For a PR scope, the reviewers and your own verification read the working tree, so the PR's head must be checked out. Compare `gh pr view <n> --json headRefOid --jq .headRefOid` with `git rev-parse HEAD`. If they differ and no tracked file has uncommitted changes, run `gh pr checkout <n>`. Otherwise, or if the checkout fails, stop and ask.
+For a PR scope, the reviewers and your own verification read the working tree, so the PR's head must be checked out. Compare `gh pr view <n> --json headRefOid --jq .headRefOid` with `git rev-parse HEAD`. If they differ and no tracked file has uncommitted changes, run `gh pr checkout <n>` and say which branch you left. Otherwise, or if the checkout fails, stop and ask.
 
 ## 2. Map before you dispatch
 
@@ -41,13 +41,13 @@ The roster lives in `~/.claude/agents/`:
 | `test-reviewer` | Missing tests for risky behavior, tests that cannot fail |
 | `ops-reviewer` | Rollout safety, migrations, health checks, deploy config, observability |
 
-Choose up to N reviewers for the scope and focus. Include `bug-reviewer` whenever the scope contains code. A plan or doc scope uses `spec-reviewer`, `docs-reviewer` and the reviewers whose area the plan covers. Include `spec-reviewer` for a milestone, a PR with a linked issue, or a plan. Include `security-reviewer` when the scope touches auth, input handling, secrets or CI workflows. Include `ops-reviewer` when the scope touches deploy config, deploy workflows or migrations. For a large repo, run the same reviewer on two separate areas instead of adding a reviewer with nothing to look at. Start at most one `test-reviewer`. It is the only reviewer that runs tests, and two test runs in one checkout can fail each other.
+Choose the reviewers for the scope and focus, as many as N allows. Include `bug-reviewer` whenever the scope contains code. A plan or doc scope uses `spec-reviewer`, `docs-reviewer` and the reviewers whose area the plan covers. Include `spec-reviewer` for a milestone, a PR with a linked issue, or a plan. Include `security-reviewer` when the scope touches auth, input handling, secrets or CI workflows. Include `ops-reviewer` when the scope touches deploy config, deploy workflows or migrations. For a large repo, run the same reviewer on two separate areas instead of adding a reviewer with nothing to look at. Start at most one `test-reviewer`. It is the only reviewer that runs tests, and two test runs in one checkout can fail each other.
 
 `accessibility-reviewer` also lives in `~/.claude/agents/` but is not part of this roster. Never start it from this skill, also when a focus word names accessibility. It runs only when the user asks for an accessibility review.
 
-N is a hard limit. When these rules ask for more than N reviewers, keep `bug-reviewer`, then `security-reviewer`, then `spec-reviewer`, then the reviewers the focus words name, then the rest by how much of the scope they cover. Name the dropped reviewers in the plan line.
+N is a hard limit. When these rules ask for more reviewers than N allows, keep `bug-reviewer`, then `security-reviewer`, then `spec-reviewer`, then the reviewers the focus words name, then the rest by how much of the scope they cover. Name the dropped reviewers in the plan line.
 
-Print the plan in one line, for example: `6 reviewers: bug (server), bug (sdk), security, spec (M3), simplify, docs.` Then launch every reviewer in a single message, one Agent call each, with `subagent_type` set to the agent name. The agent files set model and effort, so omit both on these calls; a per-call value would override the file. A repo can have its own agent with the same name, and the project agent wins. Its output may then lack a `Kind:` line or use other severity words; map them to blocker, should or nit and classify the kind yourself in step 4. Each brief contains:
+Print the plan in one line, for example: `6 reviewers: bug (server), bug (sdk), security, spec (M3), simplify, docs.` Then launch every reviewer in a single message, one Agent call each, with `subagent_type` set to the agent name. The agent files set model and effort, so omit both on these calls; a per-call value would override the file. A repo can have its own agent with the same name in `.claude/agents/`, and the project agent wins. When that file sets no `model` or `effort`, pass them on the call, per the table in CLAUDE.md. Its output may then lack a `Kind:` line or use other severity words; map them to blocker, should or nit and classify the kind yourself in step 4. Each brief contains:
 
 - the scope as exact paths, the diff command, or the milestone and issue numbers
 - the focus words, if any
@@ -83,7 +83,7 @@ Below the table, list what was dropped in verification as one line each with the
 
 Skip this step when the user passed `report`.
 
-If the working tree is on the default branch, create a branch first. Fix each mechanical finding with the smallest change. Run the repo's checks for the touched files (format, lint, typecheck and the tests next to the changes, as the repo's CLAUDE.md or package scripts name them). Commit the fixes in logical groups, with messages that say what each group fixes, and stage only the files your fixes touched. If tracked files had uncommitted changes when the review started, do not commit. Leave the fixes in the tree, so the user's own work stays out of the fix commits. Report which numbers you fixed, the check results, and whether the fixes are committed.
+If the working tree is on the default branch or a detached HEAD, create a branch first. Fix each mechanical finding with the smallest change. Run the repo's checks for the touched files (format, lint, typecheck and the tests next to the changes, as the repo's CLAUDE.md or package scripts name them). Commit the fixes in logical groups, with messages that say what each group fixes, and stage only the files your fixes touched. If tracked files had uncommitted changes when the review started, do not commit. Leave the fixes in the tree, so the user's own work stays out of the fix commits. Do not commit either when step 1 checked out the PR's branch, because the branch may be someone else's. Report which numbers you fixed, the check results, and whether the fixes are committed.
 
 If a fix turns out to need a decision, move it to step 8 instead.
 
@@ -97,4 +97,4 @@ Findings the user declines are listed at the end with their reason. Do not open 
 
 ## 9. Stop
 
-Finish with: what was fixed, what was decided, what was declined, what was not walked, and the check results. Do not push or open a PR. If the user wants one, the `ship` skill takes over.
+Finish with: what was fixed, what was decided, what was declined, what was not walked, and the check results. When step 1 checked out a PR's branch, name the branch you left and offer to switch back. Do not push or open a PR. If the user wants one, the `ship` skill takes over.

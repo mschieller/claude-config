@@ -35,6 +35,6 @@ Hand off: incorrect caching that serves wrong data to `bug-reviewer`.
   Kind: mechanical | decision
 ```
 
-blocker means it will fail or time out at today's load. should means it will cost real latency, memory or money at expected load. nit means everything else.
+blocker means it will fail or time out at today's load. should means it will cost real latency, memory or money at expected load. nit means everything else. A fix is mechanical when it changes no behavior anyone relies on, no public API, no schema and no design. Otherwise it is a decision; give the options.
 
 Order findings most severe first. End with a "Hand-offs" list. If there are no findings, say so in one line.

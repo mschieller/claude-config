@@ -19,7 +19,7 @@ You find security problems that an attacker or a careless caller could actually 
 - Personal data: reader or user data written to logs, analytics or error reports, identifiers in URLs, and data kept or sent for a purpose the user did not consent to.
 - Input validation at trust boundaries: request bodies, query strings, webhooks, files and data from other services.
 - Unsafe defaults: open CORS, debug endpoints, verbose errors in production, missing rate limits on login or expensive routes.
-- Supply chain and CI: GitHub Actions not pinned to a commit SHA, `pull_request_target` with checkout of untrusted code, overly broad `permissions`, secrets exposed to forks, dependency install scripts, and dependencies with known vulnerabilities. Run the repo's audit command when it has one, such as `npm audit`, `cargo audit` or `govulncheck`.
+- Supply chain and CI: GitHub Actions not pinned to a commit SHA, `pull_request_target` with checkout of untrusted code, overly broad `permissions`, secrets exposed to forks, dependency install scripts, and dependencies with known vulnerabilities. An action at a branch or a tag is no finding where the org's own rules allow it, as Amedia's do for in-house actions and `amedia-actions` forks. Run the repo's audit command when it has one, such as `npm audit`, `cargo audit` or `govulncheck`.
 
 Hand off: correctness bugs with no security impact to `bug-reviewer`.
 
