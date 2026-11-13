@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, removes overrides nothing needs any more, pins versions, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerabilities". For a security review of code, use security-review.
+description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, removes overrides nothing needs any more, pins versions, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerable dependencies". For a security review of code, use security-review.
 ---
 
 # Audit
@@ -39,13 +39,13 @@ The summary of a raised peer range says that consumers on an older version of th
 
 ## 1. Survey
 
-Change nothing in this step.
+Change no tracked file in this step. It creates the branch, installs and runs the baseline scripts, and writes nothing else.
 
-- Run `git status --short`. If the tree has uncommitted changes, add that to the questions in step 2. If the current branch is the default branch, create `chore/audit` from it.
-- Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 6, 9 and 10 and say so in the summary.
+- Run `git status --short`. If the tree has uncommitted changes, add that to the questions in step 2. If the current branch is the default branch, create `chore/audit` from it, or `chore/audit-2` and so on when an earlier run left that name taken. Record the merge base with the default branch, `git merge-base HEAD origin/<default>`, for steps 11 and 13.
+- Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 6, 9 and 10, skip the install, audit, outdated and override items in this step and in step 11, leave the counts table out of the summary, and say so there.
 - List every `package.json` in the repo and whether the repo is a workspace.
 - Decide which packages are published. A package is published when it has no `"private": true` and either the registry has it or the repo publishes it. The registry has it when `npm view <name> name` succeeds and either the name is scoped, such as `@scope/name`, or `npm view <name> repository.url` names this repo. An unscoped name can belong to someone else's package, as `app` and `server` do. A restricted package needs the user's npm login, and without it `npm view` answers 404. The repo publishes it when a workflow or script runs `npm publish`, `pnpm publish` or `changeset publish`, or the package has a `publishConfig`. Every other package is an app.
-- Run the frozen install.
+- Run the frozen install. If it fails because the lockfile does not match `package.json`, add that to the questions in step 2, since every later step needs the install.
 - Record the audit counts for info, low, moderate, high and critical. These are the "before" numbers in the summary.
 - Record the outdated packages, split into those with a newer patch or minor and those with a newer major.
 - List every override in the places the reference file names. Find why each one was added, from a comment next to it or from the commit that added it and that commit's PR. `git log -S'<name>' --reverse -- <file>` lists the commits that changed the name, oldest first. Record the reason as a fix, when the forced version fixes an advisory or a bug, or as a hold-back, when a newer version broke the repo. Record it as unknown when nothing says.
@@ -59,7 +59,7 @@ Change nothing in this step.
   - whether a Dependabot config exists, and which workflows mention `dependabot`
   - whether `config/renovate-config.js` in `amedia/renovate` lists the repo
   - whether the bot has an open onboarding PR in the repo, titled "configure renovate"
-- Run every script in each `package.json` that tests, lints, typechecks or builds. Record what already fails. This is the baseline for step 11.
+- Run every script in each `package.json` that tests, lints, typechecks or builds. Record what already fails. This is the baseline for step 11. Run `git status --short` again afterwards. A tracked file that was clean before and that a script changed goes back with `git restore <path>`, so it stays out of the first commit.
 
 ## 2. Questions
 
@@ -71,7 +71,8 @@ Ask everything the survey raised in one round with AskUserQuestion, with the rec
 - A missing `CODEOWNERS` file. Ask whether to add one. If yes, ask who owns the code: one owner for everything, or different owners for different paths, and which teams or people. Offer the candidates from the survey and let the user name others. Recommend one team for `*` when the user is in a team with access to the repo.
 - An override with an unknown reason. Offer to treat it as a fix, which step 9 removes when nothing needs it, or as a hold-back, which step 9 keeps. Recommend a fix. The baseline scripts in step 9 catch many wrong removals, while a wrongly kept override stays until someone checks it by hand.
 - Tests that fail before any change. Offer to continue with those failures noted, or to stop.
-- Uncommitted changes in the tree.
+- A frozen install that fails. Offer to update the lockfile in a first commit of its own, or to stop. Recommend the update, because the repo's CI fails the same way until someone makes it.
+- Uncommitted changes in the tree. Offer to stop so the user can commit or move them, or to commit them now as a first commit of their own, below every audit commit. Recommend stopping. The run cannot go on with a dirty tree, because the rebase in step 11 refuses one.
 
 After this round the run is unattended. When something new comes up, take the option you would have recommended and list it in the summary.
 
@@ -153,11 +154,13 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 - Commit, then dry-run from the repo root. Renovate ignores an untracked config file.
 
   ```
-  GITHUB_COM_TOKEN=$(gh auth token) LOG_LEVEL=debug npx --yes renovate --platform=local > <scratchpad>/renovate.log 2>&1
+  GITHUB_COM_TOKEN=$(gh auth token) LOG_LEVEL=debug npx --yes renovate@<version> --platform=local > <scratchpad>/renovate.log 2>&1
   ```
 
+  The command gets your GitHub token, so name an exact `<version>`: the newest one in `npm view renovate time --json` that is at least 3 days old.
+
   The run is good when the log says `Config file exists` for the config, has no line about an onboarding branch, and ends `Dependency extraction complete` with counts that cover the package files, the Dockerfiles and the workflows. No update for an `amedia/` or `amedia-actions/` dependency in the log may have a `newDigest`. No update with `"isPin": true` may belong to a `peerDependencies` entry, to `dependencies` or `optionalDependencies` of a published package, or to a catalog entry named in the third rule. Collect every `Failed to look up` line for the summary. A private package fails here because the local run has no registry login. The local run only looks up versions. It does not simulate branches or PRs.
-- If `config/renovate-config.js` does not list the repo, open a PR that adds it. Clone `amedia/renovate` into the scratchpad, branch, add `"amedia/<repo>",` as the last line of the block under the section comment that matches the owner, or the one chosen in step 2, and follow that repo's commit and PR title convention. Run `node --check config/renovate-config.js` before you push, because that repo's CI does. Open one PR per audited repo. In T3 Code, link the PR to the thread. Do not watch or merge it.
+- If `config/renovate-config.js` does not list the repo, look for an open PR that already adds it, with `gh pr list -R amedia/renovate --state open --search "<repo> in:title,body"`. When one exists, name it in the summary and open no second one. Otherwise open a PR that adds the repo. Clone `amedia/renovate` into the scratchpad, branch, add `"amedia/<repo>",` as the last line of the block under the section comment that matches the owner, or the one chosen in step 2, and follow that repo's commit and PR title convention. Run `node --check config/renovate-config.js` before you push, because that repo's CI does. Open one PR per audited repo. In T3 Code, link the PR to the thread. Do not watch or merge it.
 - Leave an open onboarding PR from the bot alone and name it in the summary. The config from this run replaces it.
 - The shared preset takes the reviewers of Renovate's PRs from `CODEOWNERS`. When the repo has no such file after step 4, say in the summary that Renovate's PRs get no reviewers.
 
@@ -212,7 +215,7 @@ Commit when done.
 Work through these in order and stop as soon as the audit is clean and nothing is outdated within its major.
 
 1. Run the audit fix that updates the lockfile.
-2. Move each direct dependency to the newest patch or minor of its current major.
+2. Move each direct dependency to the newest patch or minor of its current major. Below 1.0.0 the minor counts as the major, as a caret range treats it.
 3. For each advisory that is left, find which direct dependency pulls the package in, and update that dependency.
 4. Add an override only when no update removes the advisory. Record the package, the version and the advisory id for the summary.
 
@@ -229,7 +232,9 @@ Then check each override from the survey, also when the audit was clean from the
 - When the audit reports the version an override forces, raise the override to the lowest version that fixes the advisory. Updating the parent cannot fix that.
 - Remove each other override, update the lockfile without installing, and compare the versions the package resolves to with and without it. Keep the override when a version drops or the audit reports a new advisory.
 - Otherwise remove a fix and keep a hold-back, by the reason from the survey or the answer from step 2. An unchanged version does not show that a hold-back is no longer needed, because the lockfile keeps any version the parent's range allows until the next update.
-- Run the install after the removals, then the baseline scripts. The lockfile-only update leaves `node_modules` on the overridden versions. When a script that passed now fails, put the removed overrides back one at a time until it passes, and keep the last one you put back.
+- Run the install after the removals, then the baseline scripts. The lockfile-only update leaves `node_modules` on the overridden versions. When a script that passed now fails, put the removed overrides back one at a time until it passes. Keep the override whose return made it pass, remove the others again, and run the scripts once more. If they fail again, repeat with that override kept.
+
+With pnpm, also update `packageManager` as the reference file's "Package manager version" section says.
 
 Commit when done.
 
@@ -249,7 +254,7 @@ For each major an advisory needs:
 ## 11. Verify
 
 - Run every script from the survey's baseline again. A script that passed before must pass now.
-- Compare the `peerDependencies` of each `package.json` with the merge base. The command prints nothing when they match:
+- Compare the `peerDependencies` of each `package.json` with the merge base from the survey. Skip a `package.json` that does not exist at the merge base. The command prints nothing when they match:
 
   ```
   diff <(git show "<merge-base>:<path>" 2>/dev/null | jq -S '.peerDependencies // {}') <(jq -S '.peerDependencies // {}' "<path>")
@@ -259,7 +264,8 @@ For each major an advisory needs:
 - Run the same comparison on `.dependencies` and `.optionalDependencies` of each published package. No entry may have lost its range.
 - When a Dockerfile changed and Docker is available, build the image.
 - When a workflow changed and `actionlint` is installed, run it. When it is not installed, skip it and leave it out of the summary.
-- Trace each new failure to its commit. Fix it there, or revert that commit and record why.
+- Trace each new failure to its commit. Fix it there, or undo that commit's change and record why.
+- A fix or an undo from this step goes into the commit that caused it, never on top, so that a stack can still be cut at commit boundaries. Commit it with `git commit --fixup=<sha>`, then run `git rebase --autosquash <merge-base>`. The branch is not pushed, so rewriting it is safe.
 - Record the audit counts again. These are the "after" numbers.
 
 ## 12. Summary
@@ -268,18 +274,19 @@ Report in this order:
 
 - The audit counts before and after, as a table with info, low, moderate, high and critical.
 - Each advisory that is left, with the reason it could not be fixed.
-- Each updated package as `{name}: {old} -> {new}`, under `dependencies` and `devDependencies`.
-- Each raised or widened peer dependency range as `{name}: {old} -> {new}`, and each peer major that stays allowed without a fix for an advisory.
+- Each updated package as `{name}: {old} to {new}`, under `dependencies` and `devDependencies`.
+- Each raised or widened peer dependency range as `{name}: {old} to {new}`, and each peer major that stays allowed without a fix for an advisory.
 - Each catalog entry left as a range because a published package uses it.
 - Each changeset added, with its packages and bumps.
 - Each package without a `private` field that the audit treated as an app.
 - Node: the version before and after, and each file that changed.
-- Workflows: each action as `{name}: {old} -> {new}`, and each major not taken with its reason. The actions kept at an allowlisted ref, the blocked actions with their forks, and the deprecated `amedia/github-workflows` references with their replacements. Outside Amedia, say that nothing updates the pins until the repo runs Renovate or Dependabot.
+- Workflows: each action as `{name}: {old} to {new}`, and each major not taken with its reason. The actions kept at an allowlisted ref, the blocked actions with their forks, and the deprecated `amedia/github-workflows` references with their replacements. Outside Amedia, say that nothing updates the pins until the repo runs Renovate or Dependabot.
 - Whoami: what changed, and any problem left. Say that `apptool who info` shows the result only after the merge.
 - Code owners: the file added and its owners, or that the repo already had one, or that the user declined. The command that checks the file after the push.
 - Renovate: added, updated or already correct. The dry-run result and the failed lookups. The URL of the `amedia/renovate` PR, and that it should merge after the repo's own PR, because the bot opens an onboarding PR in a listed repo that has no config. Any open onboarding PR.
 - Majors: each one done, and each one not done with its reason.
 - Overrides added, raised and removed, and each one kept with its reason.
+- With pnpm: the `packageManager` version before and after, and each dependency build script the install did not run.
 - What the user must test by hand because this run could not.
 - Each choice made without asking.
 - The PR shape recommendation from step 13.
@@ -299,4 +306,8 @@ Recommend a single PR when no major upgrade needed source changes and the count 
 
 Fold a small layer into its neighbour. Say how many layers the stack has and why each one is separate.
 
-Ask with AskUserQuestion, with the recommended shape first. Then hand over to the `ship` skill. For a stack, give it the layer plan: for each layer, bottom to top, the branch name, its last commit, the PR title and what the body should say.
+Ask with AskUserQuestion, with the recommended shape first.
+
+For a stack in a repo whose CI fails a PR without a changeset, give each layer that has none the empty changeset from [Changesets](#changesets) before the hand-over. Put it into that layer's last commit with the fixup and autosquash from step 11. `ship` does not know this rule, and would answer the failed check with a changeset that releases a package.
+
+Then hand over to the `ship` skill. For a stack, give it the layer plan: for each layer, bottom to top, the branch name, its last commit, the PR title and what the body should say.
