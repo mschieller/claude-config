@@ -10,6 +10,8 @@ argument-hint: "[docs] [issues] <plan, issue or topic>"
 
 Settle every decision in the plan with the user before anything gets built. The decisions are the user's. The facts are yours.
 
+A mode word, `docs` or `issues`, counts only at the start of the arguments. When the words after it read as a topic that includes it, such as `issues with the auth flow`, ask which was meant before the first round.
+
 ## 1. Ground first
 
 Before the first round, read what the plan touches: the issue, the code, the docs and earlier decisions.
@@ -61,9 +63,9 @@ Record a decision only when all three hold:
 - A future reader would be surprised by it without the context.
 - There was a real alternative, and the choice came from a trade-off.
 
-When the repo has no format of its own, use a numbered file (`0001-slug.md`) with a title and one to three sentences: the context, the decision and the reason. Add "Considered options" or "Consequences" only when a future reader needs them.
+When the repo has no format of its own, use a numbered file (`0001-slug.md`) with a title and one to three sentences: the context, the decision and the reason. Add "Consequences" only when a future reader needs it. The reason may name the alternative it beat, but the record holds no list of rejected options.
 
-When a term gets defined during the session, add it to the glossary in the same pass. Docs state the current decision only. When a decision replaces an older one, rewrite or supersede the old record.
+When a term gets defined during the session, add it to the glossary in the same pass. Docs state the current decision only. When a decision replaces an older one, rewrite or remove the old record.
 
 ## 6. Issues mode
 
@@ -84,6 +86,6 @@ Only when the user passed `issues`. After the summary, split the settled plan in
 <only when a reader could assume more than the issue covers>
 ```
 
-Number the criteria, because `spec-reviewer` cites them as "issue #42 criterion 3". A criterion names behavior someone can check, not an implementation step. Put each decision from the table into the issue it constrains, and link issues that depend on each other.
+Number the criteria, because `spec-reviewer` cites them as "issue #42 criterion 3". A criterion names behavior someone can check, not an implementation step. Put each decision from the table into the issue it constrains, and say in each draft which other drafts it depends on.
 
-Show every draft and create nothing until the user approves. If the user has not named a milestone, ask which one to use or whether to create one. Create a milestone with `gh api repos/{owner}/{repo}/milestones -f title=<name>`, and each issue with `gh issue create --title <title> --body-file <file> --milestone <name>`. Report the issue numbers.
+Show every draft and create nothing until the user approves. If the user has not named a milestone, ask which one to use or whether to create one. Create a milestone with `gh api repos/{owner}/{repo}/milestones -f title=<name>`, and each issue with `gh issue create --title <title> --body-file <file> --milestone <name>`. Create them in dependency order, so that each body can link the issues it depends on by number. Report the issue numbers.

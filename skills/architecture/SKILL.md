@@ -8,7 +8,7 @@ argument-hint: "[drastic] [area, folder or PR]"
 
 # Architecture
 
-Propose restructurings that make the code easier to change, test and navigate, then settle the chosen ones with the user. Use the vocabulary in [VOCABULARY.md](VOCABULARY.md) exactly: module, interface, depth, seam, adapter, leverage, locality. Read it before the scan.
+Propose restructurings that make the code easier to change, test and navigate, then settle the chosen ones with the user. Use the vocabulary in [VOCABULARY.md](VOCABULARY.md) exactly: module, interface, depth, seam, adapter, leverage, locality. These are defined terms, so the plain-words rules in CLAUDE.md and `unslop` do not replace them. Read it before the scan.
 
 ## 1. Scope
 
@@ -58,7 +58,7 @@ When the interface shape is open, offer "design it twice": start three Agent cal
 
 ## 5. Decide
 
-Settle the open decisions of each picked candidate with the `ask-me` skill in `decide` mode, because nothing is built before step 6. When a candidate has more than about six open decisions, hand over to the `grill` skill instead.
+Settle the open decisions of each picked candidate with the `ask-me` skill in `decide` mode, because nothing is built before step 6. When a candidate has more than about six open decisions, hand over to the `grill` skill instead. Neither skill ends this one. When it is done, list the decisions for that candidate, update its card, and go on to the next picked candidate.
 
 When the user rejects a candidate for a reason a future review would need, offer to record it as an ADR in the repo's format, so later runs do not suggest it again.
 
