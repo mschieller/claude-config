@@ -1,6 +1,6 @@
 # npm
 
-The commands for the `audit` skill in a repo with `package-lock.json`. In a workspace, add `--workspaces` to `outdated` and `ls`, and `-w <workspace>` to `install <name>@<version>`.
+The commands for the `audit` skill in a repo with `package-lock.json`. In a workspace, add `--workspaces --include-workspace-root` to `outdated` and `ls`, because `--workspaces` alone leaves out the root project, and `-w <workspace>` to `install <name>@<version>`.
 
 ## Settings
 
@@ -32,7 +32,7 @@ It makes `npm install <name>` write the version without a range.
 
 ## Pin
 
-Take each version from `npm ls --package-lock-only --json --depth=0` and write it into the entries of `package.json` that step 6 of the skill pins. Run `npm install --package-lock-only`. In `git diff package-lock.json`, only the ranges in the root package entry may change.
+Take each version from `npm ls --package-lock-only --json --depth=0` and write it into the entries of `package.json` that step 6 of the skill pins. Run `npm install --package-lock-only`. In `git diff package-lock.json`, only the ranges in the root package entry and in the entry of each workspace package may change.
 
 ## Overrides
 

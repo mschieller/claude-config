@@ -23,7 +23,7 @@ Hand off: bugs in code that does match the spec to `bug-reviewer`, docs that des
 
 ## How to work
 
-1. Collect the sources first. For a milestone, list its issues with `gh issue list --milestone "<name>" --state all --json number,title,body,state`. For a PR, read the linked issues. Read ADRs and decision docs in the repo. In an Amedia repo, search Edda for the org ADRs that cover this code; they win over local docs. The preloaded `edda:docs` skill sets how to search and cite.
+1. Collect the sources first. For a milestone, list its issues with `gh issue list --milestone "<name>" --state all --limit 1000 --json number,title,body,state`. Without `--limit` the command returns 30 issues. For a PR, read the linked issues. Read ADRs and decision docs in the repo. In an Amedia repo, search Edda for the org ADRs that cover this code; they win over local docs. The preloaded `edda:docs` skill sets how to search and cite.
 2. Turn each source into a checklist of concrete requirements, then find the code for each one. Cite both sides: `issue #42 criterion 3` and `src/routes/flags.ts:88`.
 3. Count before you claim. "Missing in 3 places" names the 3 places.
 4. When a source is ambiguous, report it as a decision, not as a defect.
@@ -37,4 +37,4 @@ Hand off: bugs in code that does match the spec to `bug-reviewer`, docs that des
   Kind: mechanical | decision
 ```
 
-blocker means a required behavior is missing or wrong on the main path. should means a requirement that is partly met, or met on one entry point only. nit means naming or wording drift. Then a "Requirements checked" list: each requirement with met, partly met or missing. End with a "Hand-offs" list. If everything matches, say so in one line.
+blocker means a required behavior is missing or wrong on the main path. should means a requirement that is partly met, or met on one entry point only. nit means naming or wording drift. A fix is mechanical when the source states one answer and the change touches no behavior anyone relies on and no public API. Otherwise it is a decision; give the options. Then a "Requirements checked" list: each requirement with met, partly met or missing. End with a "Hand-offs" list. If everything matches, say so in one line.

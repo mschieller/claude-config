@@ -10,7 +10,7 @@
 
 ## Asking me questions
 
-- When you need a decision from me and the options are discrete, use the AskUserQuestion tool. Ask open questions in plain text. The `grill` skill is the one exception. It asks in numbered rounds.
+- When you need a decision from me, use the AskUserQuestion tool whenever you can offer two to four candidate answers, also for a question that looks open. Ask in plain text only when no candidate answer can be guessed. The `grill` skill is the one exception. It asks in numbered rounds.
 - Before the tool call, outline the decision in text: what is being decided, the options, and the trade-offs between them.
 - The outline may be hidden while the dialog is open. Word each question so it stands on its own: what was found, what it causes, and what is being chosen.
 - Always recommend one option. Put it first, mark it as recommended, and give the reason in one sentence. If the choice is pure taste, say the preference is weak.

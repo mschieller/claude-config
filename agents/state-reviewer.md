@@ -36,4 +36,4 @@ Hand off: a single concrete race with no modeling problem to `bug-reviewer`.
   Kind: mechanical | decision
 ```
 
-blocker means a reachable state that loses data, blocks a user permanently or corrupts records. should means a reachable contradictory state or a missing way out. nit means a model that is implicit but not yet buggy. For each entity you reviewed, add its transition table in a compact form. End with a "Hand-offs" list. If there are no findings, say so in one line.
+blocker means a reachable state that loses data, blocks a user permanently or corrupts records. should means a reachable contradictory state or a missing way out. nit means a model that is implicit but not yet buggy. A fix is mechanical when it changes no behavior anyone relies on, no public API, no schema and no design. Otherwise it is a decision; give the options. For each entity you reviewed, add its transition table in a compact form. End with a "Hand-offs" list. If there are no findings, say so in one line.

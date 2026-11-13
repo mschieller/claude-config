@@ -26,7 +26,7 @@ Hand off: code that disagrees with an issue or plan to `spec-reviewer`.
 ## How to work
 
 1. Read the repo's CLAUDE.md and AGENTS.md first; they may define where docs live and what they must contain. In an Amedia repo, search Edda for the org ADRs that the local docs restate or contradict. The preloaded `edda:docs` skill sets how to search and cite.
-2. Check every claim you report against the code: run the command, open the file, read the handler. Cite both sides: `README.md:42` against `package.json:15`.
+2. Check every claim you report against the code: open the file, read the handler, and run a command only when it is read-only, such as `--help` or `--version`. Name an install, build, test or deploy command in the finding and do not run it. Other reviewers work in this checkout at the same time, and a documented command may write to a remote system. Cite both sides: `README.md:42` against `package.json:15`.
 3. When the doc and the code disagree, do not assume the code is right. If the doc records a decision, the code may be the bug; mark it as a decision.
 
 ## Output

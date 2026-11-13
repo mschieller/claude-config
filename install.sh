@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Links this repo's CLAUDE.md, skills and agents into ~/.claude.
 # Skills are linked one directory at a time because ~/.claude/skills/synced is managed by claude.ai.
-# An existing file that is not a symlink is left alone and reported, so nothing is overwritten.
+# An existing file that is not a symlink, and a live symlink that points outside this repo,
+# is left alone and reported, so nothing is overwritten.
 # A link into this repo whose target is gone is removed, so a deleted skill or agent does not linger.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")" && pwd)"
@@ -18,6 +19,16 @@ fi
 link() {
   local src="$1" dst="$2"
   if [ -L "$dst" ]; then
+    case "$(readlink "$dst")" in
+      "$repo"/*) ;;
+      *)
+        # A dead link is replaced, so links survive a move of this repo.
+        if [ -e "$dst" ]; then
+          echo "skipped: $dst links outside this repo" >&2
+          return
+        fi
+        ;;
+    esac
     ln -sfn "$src" "$dst"
   elif [ -e "$dst" ]; then
     echo "skipped: $dst exists and is not a symlink" >&2

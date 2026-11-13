@@ -14,14 +14,16 @@ Merge the base branch into the current branch after understanding what landed on
 - Know what the base's side of a conflict was for before resolving it. Read the commit that introduced it, not only the hunk.
 - Never use `-X ours`, `-X theirs`, or `git checkout --ours/--theirs` on a file where both sides made real edits. Whole-file side-taking is fine only for generated files and for a file one side deleted.
 - Never discard the branch's work to make a conflict go away, and never `git merge --abort` and report failure. Resolve it, or stop with the conflicted state intact and explain what blocks you.
-- Never merge over uncommitted changes to tracked files, and never stash them away. Worktrees and other sessions share one stash stack, so a pop can take another session's entry.
+- Never merge when an uncommitted change touches a file the merge brings in, and never stash changes away. Worktrees and other sessions share one stash stack, so a pop can take another session's entry.
 
 ## 1. Preflight
 
 1. Find the base: the argument when one is given, else the PR's `baseRefName` from `gh pr view --json baseRefName`, else `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. If the current branch is the base, there is nothing to sync.
-2. Run `git status --porcelain --untracked-files=no`. If it lists changes, ask whether to commit the work first or stop. Untracked files do not count, because git refuses a merge that would overwrite one.
-3. Run `git fetch origin --prune` and work against `origin/<base>`, never a local copy that may be stale.
-4. If `git merge-base --is-ancestor origin/<base> HEAD` succeeds, report "already up to date" and stop.
+2. If `gh stack view` lists the current branch, it is in a stack. Stop and use `gh stack sync`, as the stack mode of the `ship` skill describes. A stack is updated by rebasing, and a merge commit breaks that.
+3. Find the remote. It is `origin`, unless the repo has none or `origin` is a fork of the repo that `gh repo view --json nameWithOwner` names. Then use the remote in `git remote -v` that points to that repo, and stop if none does. The steps below write `origin` for it.
+4. Run `git fetch origin --prune` and work against `origin/<base>`, never a local copy that may be stale.
+5. If `git merge-base --is-ancestor origin/<base> HEAD` succeeds, report "already up to date" and stop.
+6. Run `git status --porcelain --untracked-files=no`. If it lists a file that `git diff --name-only HEAD...origin/<base>` also lists, ask whether to commit the work first or stop. Ask the same when any change is staged, which `git diff --cached --quiet` shows by failing, because git refuses to merge with a staged change. Other uncommitted changes stay as they are, and git carries them through the merge. Untracked files do not count, because git refuses a merge that would overwrite one.
 
 ## 2. Divergence brief
 
@@ -37,9 +39,9 @@ If nothing in the brief is surprising, merge right after showing it. Pause only 
 
 ## 3. Merge and resolve
 
-Run `git merge origin/<base>`. Classify each conflict:
+Run `git merge --no-ff --no-commit origin/<base>`. Without `--no-commit`, a clean merge commits at once with git's default message, before steps 4 and 5 have run. Classify each conflict:
 
-- **Lockfiles** (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `Cargo.lock`, `go.sum`). Take the base's version, then reinstall so the branch's dependency changes are resolved again.
+- **Lockfiles** (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `Cargo.lock`, `go.sum`). Take the base's version, then reinstall so the branch's dependency changes are resolved again. The reinstall keeps the base's versions wherever the manifests allow them, so it drops a change the branch made only in the lockfile, such as an audit fix or an update inside a range. Find those commits with `git log <merge-base>..HEAD -- <lockfile>`, run their command again after the reinstall, and confirm that the package manager's audit reports nothing the branch had fixed.
 - **Generated files** (route trees, OpenAPI or GraphQL clients, ORM clients, build output, `*.tsbuildinfo`). Take either side, then run the generator. Never hand-merge them.
 - **Migrations.** Never hand-merge SQL. Check the ordering even when they merge cleanly: a branch migration may now sort before a base migration it depends on. If it does, regenerate the branch's migration on top of the merged schema with the repo's ORM command. If the base squashed or regenerated its migration chain, regenerate the branch's schema change on top of the new chain.
 - **Docs, CLAUDE.md and ADRs.** A conflict here is two decisions, not two texts. Keep each decision in one home doc with its reason, and make the other docs point to it. Registers of independent items, such as decision lists or roadmaps, usually keep both sides' entries; check that neither entry is stale.
@@ -68,7 +70,7 @@ When a check fails for a reason unrelated to the merge, check whether it fails o
 
 ## 6. Commit and report
 
-The merge commit message says what came in and how the non-obvious conflicts were resolved, not only `Merge branch 'main'`.
+Stage the resolutions and the fixes from step 4 by path, never with `git add -A`, so that changes the user left uncommitted stay out. Commit the merge with `git commit -m`. The message says what came in and how the non-obvious conflicts were resolved, not only `Merge branch 'main'`.
 
 Report:
 

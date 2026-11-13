@@ -1,7 +1,7 @@
 ---
 name: docs-review
 description: Audit a repo's documentation against itself and against the code, fix the mechanical findings, then walk the rest one finding at a time with a drafted fix and options. Covers README, docs folders, ADRs and decision docs, CLAUDE.md and AGENTS.md, Edda files and code comments that assert something. Use when the user asks to review the docs, check for doc drift, or make sure the docs are up to date.
-argument-hint: "[docs | code] [doc names or areas, empty means all]"
+argument-hint: "[report] [docs | code] [doc names or areas, empty means all]"
 ---
 
 # Docs review
@@ -22,8 +22,9 @@ Find where the documentation disagrees with itself or with the code, then settle
 - No mode: run the docs pass, then the code pass.
 - `docs` or `code`: run that pass only.
 - Doc names or areas narrow the findings to those docs or areas. Still read the other docs, because a contradiction needs both sides in view.
+- `report`: change nothing on disk. Skip step 4 and the commit in step 5, list the mechanical findings in the table with the others, and run step 6 with `ask-me` in `decide` mode, so the answers are recorded and nothing is edited or committed.
 
-Run `git status --porcelain --untracked-files=no` and note whether tracked files have uncommitted changes. The commit rules in steps 5 and 6 depend on it.
+Run `git status --porcelain --untracked-files=no` and note whether tracked files have uncommitted changes. The commit rules in steps 5 and 6 depend on it. Run the repo's checks once and record what already fails, so that a later commit is held back only by a new failure.
 
 Read the repo's CLAUDE.md and AGENTS.md first. They name the docs layout, the working principles and any status tracking (status lines, a roadmap with open decisions, a decision register).
 
@@ -76,7 +77,7 @@ Below the table:
 - Checked and aligned: the areas that match, named, so a clean area reads as verified.
 - Improvement proposals from docs pass point 9, in their own section, each naming the decision it challenges.
 
-Then run the repo's checks and commit the mechanical fixes as one commit, so each later commit holds one finding. Stage only the files you changed. If you are on the default branch, create a branch first. If tracked files had uncommitted changes at the start, commit nothing in this run, here or in step 6, and say so in the wrap-up.
+Then run the repo's checks and commit the mechanical fixes as one commit, so each later commit holds one finding. Stage only the files you changed. If you are on the default branch or a detached HEAD, create a branch first. If tracked files had uncommitted changes at the start, commit nothing in this run, here or in step 6, and say so in the wrap-up.
 
 If there are no findings and nothing was fixed, report "No findings", list the aligned areas, and stop.
 
@@ -90,7 +91,7 @@ The outline for each finding also holds:
 2. For a divergence, the argument: what the doc's version gives, what the code's version gives, and which principle decides it. The verdict is "the doc is stale", "the code is a bug", or "both are wrong" with a third design.
 3. The drafted fix, written out: doc text, code change, comment rewrite or the missing test.
 
-Every dialog also has a defer option.
+Every dialog also has a defer option. AskUserQuestion takes at most four options. When the verdicts, "Leave as is" and defer would make five, leave out "Leave as is", since defer also changes nothing now.
 
 For an improvement proposal, show the current decision and its recorded reason fairly first, then the improvement, the new basis that justifies reopening it, and the decisions that depend on it and would have to move too.
 
@@ -99,8 +100,8 @@ Applying an answer means all of this, before the next finding:
 - Change the code and the doc together.
 - Update the home doc only, and update any status line, register or roadmap the repo keeps.
 - Record a deferred item where the repo records deferred work.
-- Run the repo's checks for what changed. Never commit while a check fails.
-- Commit the finding as one commit containing all its edits. Nothing is committed for "Leave as is" or "defer". If you are still on the default branch, create a branch first.
+- Run the repo's checks for what changed before the commit, also when they are slow. The rule in `ask-me` that moves a slow check to its close does not apply here. Never commit while a check fails that passed at the start.
+- Commit the finding as one commit containing all its edits. Nothing is committed for "Leave as is" or "defer". If you are still on the default branch or a detached HEAD, create a branch first.
 
 ## 7. Wrap up
 

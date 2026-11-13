@@ -23,7 +23,7 @@ Hand off: a bug you find while reading tests to `bug-reviewer`.
 ## How to work
 
 1. Read the repo's CLAUDE.md and AGENTS.md for its test commands and rules.
-2. Run the tests for the files in scope with the repo's test command, limited to those files. Do not run the full suite. Report the result in one line: passed, failed, skipped.
+2. Run the tests for the files in scope with the repo's test command, limited to those files. Do not run the full suite. If the command starts a server or a container, do not run it, and name it in the report. Report the result in one line: passed, failed, skipped.
 3. For a missing test, name the behavior and the lowest layer where a test would fail on the current code. Prefer adding a row to an existing table or case over a new test.
 
 ## Output
