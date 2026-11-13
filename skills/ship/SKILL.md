@@ -16,7 +16,7 @@ Stop at the step the request names. "Commit" stops after step 3. "Commit and pus
 
 - Run `git status --short`. If it shows changes unrelated to the task, ask which to include. Never stash or discard the user's changes.
 - Find the base branch: the PR's `baseRefName` if a PR exists, otherwise `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. Never assume `main`.
-- Name the branch `<type>/<slug>`: a conventional commit type (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `ci` or `build`) and a kebab-case slug of at most five words that says what the change does, such as `fix/login-redirect-loop`. On the base branch, create it with `git switch -c <name>`. On any other branch, look up its PR with `gh pr view --json state`. If the PR is `OPEN` or `CLOSED`, keep the name, because the PR is tied to it. If there is no PR or it is `MERGED`, rename the branch with `git branch -m <name>`, unless its name already starts with one of those types and a slash. A tool such as T3 may have named the branch that way already. Keep such a name as it is, and do not rename it to get a better slug.
+- Name the branch `<type>/<slug>`: a conventional commit type (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `ci` or `build`) and a kebab-case slug of at most five words that says what the change does, such as `fix/login-redirect-loop`. On the base branch or a detached HEAD, create it with `git switch -c <name>`. On any other branch, look up its PR with `gh pr view --json state`. If the PR is `OPEN` or `CLOSED`, keep the name, because the PR is tied to it. If there is no PR or it is `MERGED`, rename the branch with `git branch -m <name>` only when two things hold. The branch has no upstream, so `git rev-parse --abbrev-ref '@{upstream}'` fails. And its name does not already start with one of those types and a slash. A branch with an upstream is on the remote, where other people may use it, so keep its name and never delete it from the remote. A tool such as T3 may have given the branch a type name already. Keep such a name as it is, and do not rename it to get a better slug.
 
 ## 2. Checks
 
@@ -24,15 +24,17 @@ Run what CI runs, limited to the touched files where the repo allows it: format,
 
 ## 3. Commit
 
-Group the changes into logical commits. Follow the repo's commit title convention; read `git log --oneline -20` to see it. Messages state what changed and why. Add no attribution trailer or "generated with" line.
+Group the changes into logical commits. Write every commit title as a conventional commit: `<type>: <summary>` or `<type>(<scope>): <summary>`, with a type from the list in step 1, a lowercase summary in the imperative, and no period at the end. Mark a breaking change with `!` before the colon. Read `git log --oneline -20` and use a scope only when the repo's log already uses scopes, with the names it uses. Messages state what changed and why. Add no attribution trailer or "generated with" line.
 
 ## 4. Open or update the PR
 
-Run `git fetch origin`. If the branch is behind the base, bring it up to date with the `sync-base` skill before pushing. The sync runs here, after the commit, because `sync-base` stops when tracked files have uncommitted changes.
+Run `git fetch origin`, or fetch the remote that step 1 of `sync-base` names when `origin` is not the PR's repo. If the branch is behind the base, bring it up to date with the `sync-base` skill before pushing. The sync runs here, after the commit, because `sync-base` asks when an uncommitted change touches a file the merge brings in. Changes you left out in step 1 do not block it otherwise.
 
-Check for an existing PR first: `gh pr view --json number,url,state,body`. The command also returns merged and closed PRs. If an open one exists, push, and update the body when the scope has changed. If none exists or the PR is `MERGED`, push with `git push -u origin HEAD` and open a real PR, not a draft, so review bots run. If step 1 renamed a branch that was already pushed, then delete the old name from the remote with `git push origin --delete <old-name>`. The new name holds the same commits. If the PR is `CLOSED`, ask whether to reopen it or open a new one.
+Check for an existing PR first: `gh pr view --json number,url,state,body`. The command also returns merged and closed PRs. If an open one exists, push, and update the body when the scope has changed. If none exists or the PR is `MERGED`, push with `git push -u origin HEAD` and open a real PR, not a draft, so review bots run. If the PR is `CLOSED`, ask whether to reopen it or open a new one.
 
-Title: follow the repo's convention from recently merged PRs. Say why the change matters, not which mechanism changed.
+If the remote rejects the push because its branch has commits the local one lacks, merge them with `git pull --no-rebase origin <branch>`, run the checks from step 2 again and push. Never force-push outside stack mode.
+
+Title: a conventional commit title in the form from step 3, with the type that fits the PR as a whole. A squash merge makes it the commit title on the base branch. Say why the change matters, not which mechanism changed.
 
 Body, written with the `unslop` skill and checked for secrets and private details before posting:
 
@@ -67,15 +69,17 @@ In T3 Code, link the PR to the thread with `link_pull_request`.
 
 ## 5. Watch
 
-In T3 Code, call `watch_pull_request` and end your turn. T3 wakes you when a check fails, checks pass, someone comments or reviews, or the branch conflicts. Outside T3, run `gh pr checks <n> --watch` with the Monitor tool. Never write `sleep` or polling loops.
+First act on what is already there, as step 6 describes: failed checks on the head commit, and comments nobody has answered. A watch reports only what happens after it starts. A repo without CI has nothing to wait for: when the head commit has no workflow file under `.github/workflows` and `gh pr checks <n>` reports no checks, go to step 7. `gh pr checks` alone does not show that, because a PR opened seconds ago reports no checks either.
+
+Then, in T3 Code, call `watch_pull_request` and end your turn. T3 wakes you when a check fails, checks pass, someone comments or reviews, or the branch conflicts. Outside T3, run `gh pr checks <n> --watch --fail-fast > /dev/null 2>&1` as a background command. It exits when the checks finish, with a non-zero code when one failed. Then list the comments once, because this command never reports them. Never write `sleep` or polling loops.
 
 When a wake needs no action, end the turn without a message.
 
 ## 6. On each wake
 
-Act on failed checks for the head commit, and on every review thread or PR comment that is unresolved and that you have not answered. Ignore a failure on an older commit. On the first wake, start with the comments that were there before the watch began.
+Act on failed checks for the head commit, and on every review thread or PR comment that is unresolved and that you have not answered. Ignore a failure on an older commit.
 
-`gh pr view` does not show review threads. List the unresolved ones with:
+List the conversation comments and review summaries with `gh pr view <n> --comments`. That command does not show review threads. List the unresolved ones with:
 
 ```
 gh api graphql -F owner='{owner}' -F repo='{repo}' -F number=<n> -f query='
@@ -99,6 +103,15 @@ mutation($threadId: ID!) {
 }'
 ```
 
+Reply inside a thread with the same `id`. `gh pr comment` posts to the conversation instead, outside the thread:
+
+```
+gh api graphql -f threadId=<id> -F body=@<file> -f query='
+mutation($threadId: ID!, $body: String!) {
+  addPullRequestReviewThreadReply(input: {pullRequestReviewThreadId: $threadId, body: $body}) { comment { url } }
+}'
+```
+
 - **Failed check.** Read the failed log with `gh run view <run-id> --log-failed`. Decide whether it is a real failure or an infrastructure flake. Fix real failures, run the checks from step 2, commit and push. Re-run a flake once with `gh run rerun <run-id> --failed`; if it fails again, treat it as real.
 - **Conflict or branch behind.** Use the `sync-base` skill, run the checks, and push.
 - **Comment from `amedia-idp`.** Ignore it and do not reply. The bot posts deploy information, not review findings. Its login is `amedia-idp` in GraphQL and `gh pr view`, and `amedia-idp[bot]` in the REST API.
@@ -109,7 +122,7 @@ Keep the PR at the size its goal needs. Decline extra tests, guards for cases th
 
 ## 7. Stop
 
-Ship is done when the required checks pass on the head commit. Before you stop, handle the review comments that are already there, as in step 6. A fix starts another CI round. Never wait for a review that has not arrived, and never wait for an approval.
+Ship is done when the required checks pass on the head commit, or when the repo has no CI, as step 5 defines it. Before you stop, handle the review comments that are already there, as in step 6. A fix starts another CI round. Never wait for a review that has not arrived, and never wait for an approval.
 
 Call `unwatch_pull_request` before you stop, also when you stop to ask the user something. Report the PR link, the head commit, the check results, what you fixed along the way, and any follow-ups you declined.
 
@@ -123,8 +136,8 @@ The commits must already be in layer order on the current branch, so that each l
 
 Steps 1 to 3 run as written, with one branch name per layer in the form from step 1. These steps replace step 4:
 
-1. Create each layer's branch at its last commit with `git branch <name> <commit>`. The working branch stays local and is never pushed.
-2. Run `gh stack init --base <base> <bottom> ... <top>`. It adopts the branches as a stack.
+1. Create each layer's branch at its last commit with `git branch <name> <commit>`. The working branch stays local and is never pushed, so give no layer its name.
+2. Run `gh stack init --base <base> <bottom> ... <top>`. It adopts the branches as a stack and checks out the top layer. Stay on a branch of the stack for the `gh stack` commands that follow.
 3. If the base has moved since the branch left it, run `gh stack rebase`.
 4. Run `gh stack submit --auto --open`. It pushes every branch and opens one PR per layer, each based on the layer below. `--auto` skips the interactive editor. `--open` makes the PRs ready for review, so review bots run.
 5. Set each PR's title and body with `gh pr edit <n> --title <title> --body-file <file>`, in the body format of step 4.
@@ -133,7 +146,7 @@ Steps 1 to 3 run as written, with one branch name per layer in the form from ste
 Steps 5 to 7 run for every PR in the stack, with these differences:
 
 - **A fix.** Put it in the lowest layer it applies to. Check out that branch, commit, run `gh stack rebase --upstack` to carry the fix into the layers above, then `gh stack push`. This rebases and force-pushes with a lease. It is allowed only on the branches of a stack.
-- **Base moved, conflict, or a lower layer merged.** Run `gh stack sync` in place of the `sync-base` skill. On a rebase conflict it restores the branches and stops. Then run `gh stack rebase`, resolve each conflict by the rules in step 3 of `sync-base`, stage the files, and run `GIT_EDITOR=true gh stack rebase --continue` so that no editor opens. Finish with `gh stack push`.
+- **Base moved, conflict, or a lower layer merged.** Run `gh stack sync` in place of the `sync-base` skill. On a rebase conflict it restores the branches and stops. Then run `gh stack rebase`, resolve each conflict by the rules in step 3 of `sync-base`, stage the files, and run `GIT_EDITOR=true gh stack rebase --continue` so that no editor opens, and finish with `gh stack push`. A rebase that applies cleanly can still break the code, and a clean `gh stack sync` has already pushed. So after either path, run steps 4 and 5 of `sync-base` on each layer the rebase changed, and send what they find as a fix, as above.
 - **Stop.** Ship is done when the required checks pass on the head commit of every layer. Report every PR link, bottom to top.
 
 Never run `gh stack merge` unless the user asked for it in this session.
