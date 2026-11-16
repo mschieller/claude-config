@@ -1,6 +1,6 @@
 ---
 name: audit
-description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports, updates outdated packages, removes overrides nothing needs any more, pins versions, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerable dependencies". For a security review of code, use security-review.
+description: Bring a repo's dependencies and platform metadata up to date in one run. Fixes what `pnpm audit` or `npm audit` reports with patch and minor updates, lists the open Dependabot alerts it did not close, asks before a major upgrade that is not free, removes overrides nothing needs any more, pins versions, moves Node to the active LTS, moves GitHub Actions to their newest release pinned to a commit SHA, fixes the problems `apptool who info` lists in whoami, and sets up Renovate in place of Dependabot. Surveys first, asks its questions in one round, works unattended until one round of questions about majors, then reports and recommends a single PR or a stack. Always runs the whole job. Use when the user says "audit", "audit the repo" or "fix the vulnerable dependencies". For a security review of code, use security-review.
 ---
 
 # Audit
@@ -23,7 +23,7 @@ A released package is one the release tool versions:
 - With Changesets, a package without `"private": true` that is not in `ignore` in `.changeset/config.json`, and a private package when `privatePackages` in that file says so. Changesets 2 versions private packages unless `privatePackages` is `false` or sets `version: false`. Changesets 3 versions them only when `privatePackages` is `true` or sets `version: true`.
 - With `pnpm change`, every package. It does not read `.changeset/config.json`.
 
-A commit needs a changeset for each released package whose `package.json` it changes in `dependencies`, `optionalDependencies`, `peerDependencies` or `engines.node`, or whose `catalog:` entry in one of those fields it changes in `pnpm-workspace.yaml`. The bump is a patch for a dependency update or pin and for a changed `engines.node` in an app, and a minor for a raised or widened peer range or an `engines.node` added to a published package. When a package gets both in one commit, take the minor. A released app also gets a patch changeset when the commit fixes an advisory in what the app installs through the lockfile or an override alone, because the app ships what its lockfile resolves. Every other change to `devDependencies`, overrides, settings, the lockfile, workflows, Dockerfiles, whoami, code owners and Renovate needs none. A published package gets none for the lockfile or an override, because its consumers resolve their own versions.
+A commit needs a changeset for each released package whose `package.json` it changes in `dependencies`, `optionalDependencies`, `peerDependencies` or `engines.node`, or whose `catalog:` entry in one of those fields it changes in `pnpm-workspace.yaml`. The bump is a patch for a dependency update or pin and for a changed `engines.node` in an app, and a minor for a raised or widened peer range or an `engines.node` added to a published package. A major update of a dependency that reaches the package's public API, as step 10 checks, is a major. When a package gets several of these in one commit, take the largest. A released app also gets a patch changeset when the commit fixes an advisory in what the app installs through the lockfile or an override alone, because the app ships what its lockfile resolves. Every other change to `devDependencies`, overrides, settings, the lockfile, workflows, Dockerfiles, whoami, code owners and Renovate needs none. A published package gets none for the lockfile or an override, because its consumers resolve their own versions.
 
 Write the changeset as a file in `.changeset/`, in the commit it describes, so a stack keeps it with its layer. Any name ending in `.md` works except `README.md`. Changesets and `pnpm change` read the same format:
 
@@ -42,12 +42,13 @@ The summary of a raised peer range says that consumers on an older version of th
 Change no tracked file in this step. It creates the branch, installs and runs the baseline scripts, and writes nothing else.
 
 - Run `git status --short`. If the tree has uncommitted changes, add that to the questions in step 2. If the current branch is the default branch, create `chore/audit` from it, or `chore/audit-2` and so on when an earlier run left that name taken. Record the merge base with the default branch, `git merge-base HEAD origin/<default>`, for steps 11 and 13.
-- Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 6, 9 and 10, skip the install, audit, outdated and override items in this step and in step 11, leave the counts table out of the summary, and say so there.
+- Find the package manager from the `packageManager` field and the lockfile. Read [PNPM.md](PNPM.md) for `pnpm-lock.yaml` and [NPM.md](NPM.md) for `package-lock.json`. With any other package manager, or none, skip steps 6 and 9 and the dependency majors in step 10, skip the install, audit, outdated and override items in this step and in step 11, leave the counts table out of the summary, and say so there.
 - List every `package.json` in the repo and whether the repo is a workspace.
 - Decide which packages are published. A package is published when it has no `"private": true` and either the registry has it or the repo publishes it. The registry has it when `npm view <name> name` succeeds and either the name is scoped, such as `@scope/name`, or `npm view <name> repository.url` names this repo. An unscoped name can belong to someone else's package, as `app` and `server` do. A restricted package needs the user's npm login, and without it `npm view` answers 404. The repo publishes it when a workflow or script runs `npm publish`, `pnpm publish` or `changeset publish`, or the package has a `publishConfig`. Every other package is an app.
 - Run the frozen install. If it fails because the lockfile does not match `package.json`, add that to the questions in step 2, since every later step needs the install.
 - Record the audit counts for info, low, moderate, high and critical. These are the "before" numbers in the summary.
-- Record the outdated packages, split into those with a newer patch or minor and those with a newer major.
+- Record the packages with a newer major, for the summary.
+- Read the repo's open Dependabot alerts with `gh api --paginate 'repos/<owner>/<repo>/dependabot/alerts?state=open'`. Record each one's ecosystem, package, `manifest_path` and advisory id. When the call fails, alerts are off or the token lacks access, so record the message for the summary.
 - List every override in the places the reference file names. Find why each one was added, from a comment next to it or from the commit that added it and that commit's PR. `git log -S'<name>' --reverse -- <file>` lists the commits that changed the name, oldest first. Record the reason as a fix, when the forced version fixes an advisory or a bug, or as a hold-back, when a newer version broke the repo. Record it as unknown when nothing says.
 - Find every place that sets a Node version: `engines.node`, `.node-version`, `.nvmrc`, `.tool-versions`, `volta`, `node-version` inputs in workflows, every `FROM` in a Dockerfile, `@types/node` and a `@tsconfig/node<major>` base.
 - Find the active LTS line of Node. In `https://raw.githubusercontent.com/nodejs/Release/main/schedule.json` it is the line whose `lts` date has passed and whose `maintenance` date has not. Its newest release is the first entry in `https://nodejs.org/dist/index.json` whose `lts` field holds that line's codename. Also find the oldest supported line, the oldest one with an `lts` date whose `end` date has not passed.
@@ -74,7 +75,7 @@ Ask everything the survey raised in one round with AskUserQuestion, with the rec
 - A frozen install that fails. Offer to update the lockfile in a first commit of its own, or to stop. Recommend the update, because the repo's CI fails the same way until someone makes it.
 - Uncommitted changes in the tree. Offer to stop so the user can commit or move them, or to commit them now as a first commit of their own, below every audit commit. Recommend stopping. The run cannot go on with a dirty tree, because the rebase in step 11 refuses one.
 
-After this round the run is unattended. When something new comes up, take the option you would have recommended and list it in the summary.
+After this round the run is unattended until the majors question in step 10, and again after it. When something new comes up, take the option you would have recommended and list it in the summary.
 
 ## 3. Whoami
 
@@ -178,7 +179,7 @@ Amedia runs one Renovate bot from `amedia/renovate`. It only processes the repos
 
 ## 7. Node
 
-- The target is the newest release of the active LTS line from the survey.
+- The target is the newest release of the active LTS line from the survey. A move to a new major must pass the free check in step 10, with the target Node on the `PATH`. When the target Node cannot be put on the `PATH`, the major is not free. When the check fails, take the newest release of the current line instead, and record the major for step 10.
 - Update every place from the survey and keep the form each place already uses, such as `26`, `>=26` or `26.13.1`. The exception is `engines.node` in a published package, which this step never raises. Amedia's CI installs the version in `engines.node` and fails or warns when the major in the Dockerfile's final `FROM` differs.
 - When the `package.json` next to the lockfile belongs to an app and has no `engines.node`, add it with the target as an exact version, such as `26.13.1`. Add it also when a file such as `.node-version` sets the version, because Amedia's `node/setup` action fails without `engines.node`.
 - In a published package, `engines.node` is the oldest Node its consumers may run, not the Node it builds with. When it is missing, add it as `>=<major>` of the oldest supported line from the survey. When its lower bound names a line past its end date, leave it and report it as a candidate for a major release.
@@ -206,31 +207,33 @@ To pin an action:
 - Take the highest version among the releases at least 3 days old, the same wait as the shared Renovate preset. `gh api --paginate repos/<owner>/<repo>/releases` lists them with `published_at`, but not in version order, since a backport to an old major can come first. Skip drafts and prereleases. When the repo has no releases, take the highest version tag.
 - Resolve the tag with `gh api repos/<owner>/<repo>/commits/<tag> --jq .sha`. This endpoint follows an annotated tag to its commit.
 - Write the reference as `<owner>/<repo>/<path>@<full sha> # <tag>`, keeping the path when the reference has one, such as `/init` in `github/codeql-action/init`, and with the full tag such as `v4.2.1`. Renovate reads the comment as the current version.
-When a reference would move to a new major, whether a tag or a pin, read the release notes between the two versions. Compare the inputs the workflow passes and the outputs it reads with `action.yml` or `action.yaml` in the action's path at the new tag, fetched with `gh api -H 'Accept: application/vnd.github.raw' 'repos/<owner>/<repo>/contents/<path>/action.yml?ref=<tag>'`. For a reusable workflow, compare with its `on.workflow_call` block. Take the major when each one still exists with the same meaning. Otherwise take the newest version in the current major and record the major for the summary.
+When a reference would move to a new major, whether a tag or a pin, read the release notes between the two versions. Compare the inputs the workflow passes and the outputs it reads with `action.yml` or `action.yaml` in the action's path at the new tag, fetched with `gh api -H 'Accept: application/vnd.github.raw' 'repos/<owner>/<repo>/contents/<path>/action.yml?ref=<tag>'`. For a reusable workflow, compare with its `on.workflow_call` block. Take the major when each one still exists with the same meaning. Otherwise take the newest version in the current major. Record the major for step 10 when the version the repo ends up on has an advisory, or when the latest run of the workflow has an annotation that the action's Node runtime is deprecated. `gh run view <run-id>` lists the annotations. Record it for the summary otherwise.
+
+Check each action against the GitHub Advisory Database at the version the repo ends up on: `gh api '/advisories?ecosystem=actions&affects=<owner>/<repo>@<version>'`, with the version written without a leading `v`. When an advisory has a fixed version in the current major, take that version or newer. When only a new major fixes it, record that major for step 10.
 
 Commit when done.
 
 ## 9. Updates and fixes
 
-Work through these in order and stop as soon as the audit is clean and nothing is outdated within its major.
+Work through these in order and stop as soon as the audit is clean. Move a package only to fix an advisory, and leave every other update to Renovate.
 
 1. Run the audit fix that updates the lockfile.
-2. Move each direct dependency to the newest patch or minor of its current major. Below 1.0.0 the minor counts as the major, as a caret range treats it.
-3. For each advisory that is left, find which direct dependency pulls the package in, and update that dependency.
-4. Add an override only when no update removes the advisory. Record the package, the version and the advisory id for the summary.
+2. For each advisory that is left, find which direct dependency pulls the package in. Move that dependency to the newest patch or minor of its current major when that removes the advisory. Below 1.0.0 the minor counts as the major, as a caret range treats it.
+3. When no update within the current major removes the advisory, add an override, but only when the lowest fixed version is in the same major as the version it replaces. Scope the key to the part of the advisory's vulnerable range inside that major, and write the lowest fixed version as the value, such as `"ms@>=2.0.0 <2.1.3": "2.1.3"`. Copies outside the range then keep their version. Record the package, the version and the advisory id for the summary.
+4. An advisory that only a new major fixes, through an override or a direct dependency, goes to step 10.
 
-Items 2 and 3 move only the entry in `dependencies`, `devDependencies` or `optionalDependencies`. A `peerDependencies` entry for the same package keeps its range and changes only by the rule in step 6, the advisory rule below and the rule in step 10.
+Item 2 moves only the entry in `dependencies`, `devDependencies` or `optionalDependencies`. A `peerDependencies` entry for the same package keeps its range and changes only by the rule in step 6, the advisory rule below and the rule in step 10.
 
 In a published package, a `dependencies` or `optionalDependencies` entry keeps its range. An update inside the range changes only the lockfile. When an advisory covers a version the range allows, raise the lower bound to the fixed version and keep the operator, so `^4.3.0` becomes `^4.4.4`. Consumers then cannot resolve the vulnerable version.
 
 The same holds for a `peerDependencies` range of a published package when the advisory is in the peer itself. The first version that fixes it becomes the lower bound, so `^6.1.0` becomes `^6.4.3`, whatever form the range has. In a range that allows several majors, raise each part that allows a version the advisory covers. Leave a major that has no fixed version, and report it. Step 10 then widens the range by the major that has the fix.
 
-Then check each override from the survey, also when the audit was clean from the start. Overrides from item 4 stay.
+Then check each override from the survey, also when the audit was clean from the start. Overrides from item 3 stay.
 
 - Remove an override outside the root `package.json` and the root `pnpm-workspace.yaml`. npm and pnpm ignore it.
 - Remove an override for a package that nothing in the tree depends on any more.
-- When the audit reports the version an override forces, raise the override to the lowest version that fixes the advisory. Updating the parent cannot fix that.
-- Remove each other override, update the lockfile without installing, and compare the versions the package resolves to with and without it. Keep the override when a version drops or the audit reports a new advisory.
+- When the audit reports the version an override forces, raise the override to the lowest version that fixes the advisory within the major it forces. Updating the parent cannot fix that. When only a newer major fixes it, leave the override and report it.
+- Remove each other override, update the lockfile without installing, and compare the versions the package resolves to with and without it. Keep the override when a version drops or the audit reports a new advisory. When a kept override forces a major that the parent's range does not allow, record the parent version whose range does allow it, for the summary.
 - Otherwise remove a fix and keep a hold-back, by the reason from the survey or the answer from step 2. An unchanged version does not show that a hold-back is no longer needed, because the lockfile keeps any version the parent's range allows until the next update.
 - Run the install after the removals, then the baseline scripts. The lockfile-only update leaves `node_modules` on the overridden versions. When a script that passed now fails, put the removed overrides back one at a time until it passes. Keep the override whose return made it pass, remove the others again, and run the scripts once more. If they fail again, repeat with that override kept.
 
@@ -240,16 +243,55 @@ Commit when done.
 
 ## 10. Majors
 
-Attempt a major upgrade only when an advisory cannot be fixed without it. For every other package with a newer major, write one line for the summary with what the major changes for this repo, and leave it for Renovate.
+Attempt a dependency major only when an advisory cannot be fixed without it, whatever its severity and whether the package is a dev dependency. For every other package with a newer major, write one line for the summary with what the major changes for this repo, and leave it for Renovate.
 
-For each major an advisory needs:
+This step handles the majors of dependencies that step 9 left, and the Node and action majors that steps 7 and 8 recorded.
 
-- Take the version the registry tags `latest`. Skip it when it has a prerelease suffix such as `-rc`, `-beta` or `-alpha`.
-- Read the changelog or migration guide from the current version to that one. Search the repo for each API it removes or changes.
-- When nothing the repo uses breaks, or the needed changes are small and clear, upgrade and run the tests. Commit each major on its own.
+### Free majors
+
+A major is free when all four hold:
+
+- In a published package, the dependency does not reach the public API, by the check at the end of this step.
+- The changelog or migration guide between the two versions removes or changes nothing the repo uses. Search the repo for each API, option and default it removes or changes, and check for a switch to ESM only.
+- The new version's `engines.node` and peer dependencies are met without other changes.
+- The install, build, typecheck and baseline scripts pass with no source edit.
+
+For an action, the input and output check in step 8 is the free check.
+
+### Targets
+
+- For a direct dependency, the fixed major is the first one with a version outside the advisory's vulnerable range.
+- For a transitive package, the fixed major is the first major of the direct dependency whose tree resolves to a fixed version. Read each major's newest release with `npm view <parent>@<version> dependencies`, and follow the chain down to the vulnerable package.
+- The target is the newest release of the fixed major, not the registry's `latest`. Skip versions with a prerelease suffix such as `-rc`, `-beta` or `-alpha`.
+- When no major fixes the advisory, leave it for the summary.
+
+Upgrade to each dependency target, following the rules at the end of this step, and run the free check. Commit a free major on its own. Undo every other one, and write its brief.
+
+### The question
+
+Write a brief for each major that is not free, whether it is a dependency, Node or an action:
+
+- the advisories it fixes, with id and severity, or for a Node or action major without one, the reason step 7 or 8 recorded it, whether the package is a dev dependency or reaches production, and whether the repo calls the code the advisory names
+- the current version and the target
+- each breaking change between them and what it does
+- the breaking changes that hit the repo, each with its `file:line`, and the edits the upgrade needs
+- for a published package, whether the dependency reaches its public API, from the check below
+
+Show all briefs, then ask with AskUserQuestion in one round, one question per major. A round may take several dialogs. Offer "Upgrade" and "Skip and report", with the one you recommend first.
+
+### Upgrades
+
+For each approved major:
+
+- Upgrade to the target and make the edits in the brief. For Node, update every place step 7 lists. For an action, update the reference and the inputs and outputs the workflow uses.
+- Run the baseline scripts. When the upgrade needs an edit the brief did not list, or a script that passed before still fails, undo it and record the reason.
+- Commit each major on its own.
+
+These rules hold for free and approved majors alike:
+
+- In a published package, check whether the dependency reaches the public API, meaning that the package re-exports its types or values. Record the result for the changeset.
 - In `dependencies` or `optionalDependencies` of a published package, write the new version with the operator the entry has, such as `^5.1.0`.
 - When the upgraded package is also a peer dependency of a published package, widen the peer range by the new major and change nothing else in it. Add a caret range with the version the lockfile resolves, the one the tests now run against: `^6.4.0` becomes `^6.4.0 || ^7.2.1`. The old major stays allowed although it has no fix, so that consumers can move on their own schedule. Record it for the summary.
-- When the tests fail and the fix is not small, or you are not confident, undo the upgrade and record the package, the target version and the reason.
 
 ## 11. Verify
 
@@ -273,7 +315,8 @@ For each major an advisory needs:
 Report in this order:
 
 - The audit counts before and after, as a table with info, low, moderate, high and critical.
-- Each advisory that is left, with the reason it could not be fixed.
+- Each advisory that is left, with the reason it could not be fixed. Add these details: the dependency chain, the newest version of the direct dependency and whether it still pulls in the vulnerable major, whether the package is a dev dependency or reaches production, and whether the repo calls the code the advisory names. When the direct dependency is deprecated on npm or has had no release in two years, also name a maintained replacement.
+- Each open Dependabot alert from the survey that the run did not close, with the reason, or that alerts are off.
 - Each updated package as `{name}: {old} to {new}`, under `dependencies` and `devDependencies`.
 - Each raised or widened peer dependency range as `{name}: {old} to {new}`, and each peer major that stays allowed without a fix for an advisory.
 - Each catalog entry left as a range because a published package uses it.
@@ -284,8 +327,8 @@ Report in this order:
 - Whoami: what changed, and any problem left. Say that `apptool who info` shows the result only after the merge.
 - Code owners: the file added and its owners, or that the repo already had one, or that the user declined. The command that checks the file after the push.
 - Renovate: added, updated or already correct. The dry-run result and the failed lookups. The URL of the `amedia/renovate` PR, and that it should merge after the repo's own PR, because the bot opens an onboarding PR in a listed repo that has no config. Any open onboarding PR.
-- Majors: each one done, and each one not done with its reason.
-- Overrides added, raised and removed, and each one kept with its reason.
+- Majors: each free one done, each one approved or skipped in step 10, and each approved one undone with its reason.
+- Overrides added, raised and removed, and each one kept with its reason. For a kept override that forces a major the parent's range does not allow, also give the parent version that would make it unnecessary.
 - With pnpm: the `packageManager` version before and after, and each dependency build script the install did not run.
 - What the user must test by hand because this run could not.
 - Each choice made without asking.
