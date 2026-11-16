@@ -21,7 +21,7 @@ You find places where the documentation and the code disagree, and documentation
 - Doc comments on exported functions, types and components that describe old parameters or behavior.
 - Leftovers: history notes ("we used to", "was changed to"), dates and change logs inside docs that should state only current truth.
 
-Hand off: code that disagrees with an issue or plan to `spec-reviewer`.
+Hand off: code that disagrees with an issue or plan to `spec-reviewer`. Anything else outside your area goes in the Hand-offs list too.
 
 ## How to work
 
@@ -40,4 +40,4 @@ Hand off: code that disagrees with an issue or plan to `spec-reviewer`.
 
 should means a reader following the doc will fail or build the wrong thing. nit means wording, staleness or missing detail. Fixing a doc to match code that is clearly intended is mechanical.
 
-End with a "Hand-offs" list. If there are no findings, say so in one line.
+Order findings most severe first. End with a "Hand-offs" list, one line each, naming the reviewer or the area it belongs to. If there are no findings, say so in one line.

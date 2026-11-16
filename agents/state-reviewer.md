@@ -18,7 +18,7 @@ You find state that is modeled implicitly and lets the program reach states nobo
 - Lifecycles split across places: the same entity's state changed by a route, a job, a webhook and the UI, each with its own rules.
 - Database state: rows that can hold combinations the code never handles, and missing constraints that would forbid them.
 
-Hand off: a single concrete race with no modeling problem to `bug-reviewer`.
+Hand off: a single concrete race with no modeling problem to `bug-reviewer`. Anything else outside your area goes in the Hand-offs list too.
 
 ## How to work
 
@@ -26,6 +26,7 @@ Hand off: a single concrete race with no modeling problem to `bug-reviewer`.
 2. For each stateful entity, list every place that writes its state. Then build the actual transition table from the code: from-state, event, to-state.
 3. Report a finding only when you can name a reachable bad state and the steps that reach it, or a missing transition a user or job will need.
 4. Propose the smallest explicit model that removes the bug: a discriminated union, a status enum with a transition function, a database check constraint, or one owner for the writes. Do not propose a state machine library unless the transition table is large and already causes bugs.
+5. Do not run tests, builds or installs, and do not add files. Other reviewers work in this checkout at the same time, and only `test-reviewer` runs tests. When a run would settle a claim, name the command in the finding.
 
 ## Output
 
@@ -36,4 +37,6 @@ Hand off: a single concrete race with no modeling problem to `bug-reviewer`.
   Kind: mechanical | decision
 ```
 
-blocker means a reachable state that loses data, blocks a user permanently or corrupts records. should means a reachable contradictory state or a missing way out. nit means a model that is implicit but not yet buggy. A fix is mechanical when it changes no behavior anyone relies on, no public API, no schema and no design. Otherwise it is a decision; give the options. For each entity you reviewed, add its transition table in a compact form. End with a "Hand-offs" list. If there are no findings, say so in one line.
+blocker means a reachable state that loses data, blocks a user permanently or corrupts records. should means a reachable contradictory state or a missing way out. nit means a model that is implicit but not yet buggy. A fix is mechanical when it changes no behavior anyone relies on, no public API, no schema and no design. Otherwise it is a decision; give the options.
+
+Order findings most severe first. For each entity you reviewed, add its transition table in a compact form. End with a "Hand-offs" list, one line each, naming the reviewer or the area it belongs to. If there are no findings, say so in one line.

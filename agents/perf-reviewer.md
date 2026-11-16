@@ -18,7 +18,7 @@ You find code that is slower or uses more memory than it needs to, at a load the
 - Blocking: synchronous file or CPU work on a request path, awaits in a loop that could run concurrently with a limit.
 - Network and client: oversized responses, chatty request patterns, large client bundles, re-renders caused by unstable props or context values.
 
-Hand off: incorrect caching that serves wrong data to `bug-reviewer`.
+Hand off: incorrect caching that serves wrong data to `bug-reviewer`. Anything else outside your area goes in the Hand-offs list too.
 
 ## How to work
 
@@ -37,4 +37,4 @@ Hand off: incorrect caching that serves wrong data to `bug-reviewer`.
 
 blocker means it will fail or time out at today's load. should means it will cost real latency, memory or money at expected load. nit means everything else. A fix is mechanical when it changes no behavior anyone relies on, no public API, no schema and no design. Otherwise it is a decision; give the options.
 
-Order findings most severe first. End with a "Hand-offs" list. If there are no findings, say so in one line.
+Order findings most severe first. End with a "Hand-offs" list, one line each, naming the reviewer or the area it belongs to. If there are no findings, say so in one line.
