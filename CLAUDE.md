@@ -10,7 +10,7 @@
 
 ## Asking me questions
 
-- When you need a decision from me, use the AskUserQuestion tool whenever you can offer two to four candidate answers, also for a question that looks open. Ask in plain text only when no candidate answer can be guessed. The `grill` skill is the one exception. It asks in numbered rounds.
+- When you need a decision from me, use the AskUserQuestion tool whenever you can offer two to four candidate answers, also for a question that looks open. Ask in plain text only when no candidate answer can be guessed. The `dev:grill` skill is the one exception. It asks in numbered rounds.
 - Before the tool call, outline the decision in text: what is being decided, the options, and the trade-offs between them.
 - The outline may be hidden while the dialog is open. Word each question so it stands on its own: what was found, what it causes, and what is being chosen.
 - Always recommend one option. Put it first, mark it as recommended, and give the reason in one sentence. If the choice is pure taste, say the preference is weak.
@@ -21,7 +21,7 @@
 
 - Delegate only work that is parallelizable, read-heavy, or larger than one context window. Do small or sequentially dependent work in the main session.
 - Code edits and judgment calls stay in the main session unless the work splits into independent, fully specified pieces.
-- Every Agent call sets `model` and `effort` explicitly, including the built-in Explore agent (`model: haiku`). The exception is the agents in `~/.claude/agents`. Their files set model and effort, so calls to them omit both, because a per-call value overrides the file.
+- Every Agent call sets `model` and `effort` explicitly, including the built-in Explore agent (`model: haiku`). The exception is the agents of the `dev` plugin, named `dev:*`. Their files set model and effort, so calls to them omit both, because a per-call value overrides the file.
 
 | Task | Model | Effort |
 |---|---|---|
@@ -100,7 +100,7 @@ Model choice:
 - Never merge a PR, enable auto-merge or push to the default branch unless I asked in this session.
 - Find the base branch from GitHub (`gh repo view --json defaultBranchRef` or the PR's `baseRefName`). Never assume `main`.
 - Bring a branch up to date by merging the base, never by rebasing, unless I ask. The exception is a branch in a `gh stack` stack, which `gh stack` updates by rebasing and force-pushing with a lease.
-- Write every commit title and PR title as a conventional commit. The `ship` skill holds the format.
+- Write every commit title and PR title as a conventional commit. The `dev:ship` skill holds the format.
 - No attribution trailers or "generated with" lines in commits or PRs.
 - Check PR titles, bodies and comments for secrets and private details before posting.
 
@@ -117,7 +117,7 @@ Model choice:
 
 ## Writing
 
-Load the `unslop` skill before writing or editing prose: docs, READMEs, ADRs, comments, commit messages, PR text and issues. In every reply, and everywhere else:
+Load the `dev:unslop` skill before writing or editing prose: docs, READMEs, ADRs, comments, commit messages, PR text and issues. In every reply, and everywhere else:
 
 - No em dashes. Do not substitute en dashes, hyphens or parentheses. End the sentence or use a comma.
 - Use plain words. No AI vocabulary such as "delve", "crucial", "pivotal", "showcase", "leverage".

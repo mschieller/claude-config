@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
-# Links this repo's CLAUDE.md, skills and agents into ~/.claude.
-# Skills are linked one directory at a time because ~/.claude/skills/synced is managed by claude.ai.
+# Links this repo's CLAUDE.md into ~/.claude.
 # An existing file that is not a symlink, and a live symlink that points outside this repo,
 # is left alone and reported, so nothing is overwritten.
-# A link into this repo whose target is gone is removed, so a deleted skill or agent does not linger.
+# A link from ~/.claude/skills or ~/.claude/agents into this repo whose target is gone is removed.
+# The skills and agents live in the dev plugin of amedia/claude-marketplace, so links to their old copies here are dead.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")" && pwd)"
 target="$HOME/.claude"
@@ -39,16 +39,8 @@ link() {
   echo "linked: $dst"
 }
 
-mkdir -p "$target/skills" "$target/agents"
+mkdir -p "$target"
 [ -f "$repo/CLAUDE.md" ] && link "$repo/CLAUDE.md" "$target/CLAUDE.md"
-for dir in "$repo"/skills/*/; do
-  [ -d "$dir" ] || continue
-  link "${dir%/}" "$target/skills/$(basename "$dir")"
-done
-for file in "$repo"/agents/*.md; do
-  [ -f "$file" ] || continue
-  link "$file" "$target/agents/$(basename "$file")"
-done
 
 prune() {
   local dst
