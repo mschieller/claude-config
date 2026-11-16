@@ -28,7 +28,7 @@ minimumReleaseAge: 1440
 | What pulls a package in | `pnpm why <name>` |
 | Update the lockfile without installing | `pnpm install --lockfile-only` |
 
-- Bare `pnpm audit --fix` uses the `override` method and writes overrides. Use it only for step 9.4 of the skill.
+- Never run bare `pnpm audit --fix`. It writes override keys with no lower bound, such as `minimist@<0.2.4: ^0.2.4`, which move older majors too. Write the overrides for step 9 by hand.
 - `pnpm audit --fix update` rewrites a range to start at the version it installs. In an entry that keeps its range, set the lower bound back to the version that fixes the advisory, as step 9 of the skill says.
 - To move a direct dependency, edit its version in `package.json`, or in the catalog when the entry says `catalog:`, and run `pnpm install`. A catalog entry that the Pin section leaves as a range moves like a range in a published package. `pnpm add` and `pnpm update` keep a `^` or `~` that the entry already has, also with `saveExact` or `-E`.
 - A `peerDependencies` entry for the same package changes only by the rules in steps 6, 9 and 10 of the skill.
@@ -46,7 +46,7 @@ Overrides are under `overrides` in `pnpm-workspace.yaml`, or under `pnpm.overrid
 
 ## Package manager version
 
-`packageManager` in `package.json` names the pnpm version CI installs. Update it to the newest release of its current major. Treat a newer major like any other major in step 10 of the skill.
+`packageManager` in `package.json` names the pnpm version CI installs. `pnpm audit` does not check it. Update it to the newest release of its current major. Before the update, list the advisories for the current version with `gh api '/advisories?ecosystem=npm&affects=pnpm@<version>'`, and record the ones the update closes for the summary. When only a newer major fixes an advisory, treat that major like any other major in step 10 of the skill.
 
 ## Build scripts
 
