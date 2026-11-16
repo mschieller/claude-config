@@ -39,9 +39,11 @@ If nothing in the brief is surprising, merge right after showing it. Pause only 
 
 ## 3. Merge and resolve
 
-Run `git merge --no-ff --no-commit origin/<base>`. Without `--no-commit`, a clean merge commits at once with git's default message, before steps 4 and 5 have run. Classify each conflict:
+When the branch has no commits of its own, which `git merge-base --is-ancestor HEAD origin/<base>` shows by succeeding, fast-forward with `git merge --ff-only origin/<base>`. A merge commit would hold nothing. Then run steps 4 and 5 against the uncommitted changes, and make no commit in step 6.
 
-- **Lockfiles** (`pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `Cargo.lock`, `go.sum`). Take the base's version, then reinstall so the branch's dependency changes are resolved again. The reinstall keeps the base's versions wherever the manifests allow them, so it drops a change the branch made only in the lockfile, such as an audit fix or an update inside a range. Find those commits with `git log <merge-base>..HEAD -- <lockfile>`, run their command again after the reinstall, and confirm that the package manager's audit reports nothing the branch had fixed.
+Otherwise run `git merge --no-ff --no-commit origin/<base>`. Without `--no-commit`, a clean merge commits at once with git's default message, before steps 4 and 5 have run. Classify each conflict:
+
+- **Lockfiles**, such as `pnpm-lock.yaml`, `package-lock.json`, `yarn.lock`, `bun.lock`, `Cargo.lock`, `go.sum` and `uv.lock`. Take the base's version, then reinstall so the branch's dependency changes are resolved again. The reinstall keeps the base's versions wherever the manifests allow them, so it drops a change the branch made only in the lockfile, such as an audit fix or an update inside a range. Find those commits with `git log <merge-base>..HEAD -- <lockfile>`, run their command again after the reinstall, and confirm that the package manager's audit reports nothing the branch had fixed.
 - **Generated files** (route trees, OpenAPI or GraphQL clients, ORM clients, build output, `*.tsbuildinfo`). Take either side, then run the generator. Never hand-merge them.
 - **Migrations.** Never hand-merge SQL. Check the ordering even when they merge cleanly: a branch migration may now sort before a base migration it depends on. If it does, regenerate the branch's migration on top of the merged schema with the repo's ORM command. If the base squashed or regenerated its migration chain, regenerate the branch's schema change on top of the new chain.
 - **Docs, CLAUDE.md and ADRs.** A conflict here is two decisions, not two texts. Keep each decision in one home doc with its reason, and make the other docs point to it. Registers of independent items, such as decision lists or roadmaps, usually keep both sides' entries; check that neither entry is stale.
@@ -70,7 +72,7 @@ When a check fails for a reason unrelated to the merge, check whether it fails o
 
 ## 6. Commit and report
 
-Stage the resolutions and the fixes from step 4 by path, never with `git add -A`, so that changes the user left uncommitted stay out. Commit the merge with `git commit -m`. The message says what came in and how the non-obvious conflicts were resolved, not only `Merge branch 'main'`.
+Stage the resolutions and the fixes from step 4 by path, never with `git add -A`, so that changes the user left uncommitted stay out. Commit the merge with `git commit -m`. The title is `Merge origin/<base> into <branch>`, because commit linters skip a title in that form. The body says what came in and how the non-obvious conflicts were resolved.
 
 Report:
 

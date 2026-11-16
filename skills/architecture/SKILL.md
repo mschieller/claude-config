@@ -34,7 +34,7 @@ With `drastic`, widen the question to "what change would most improve this servi
 
 ## 3. Report
 
-Build one self-contained HTML report with a card per candidate:
+Build one self-contained HTML report with a numbered card for each of the six strongest candidates:
 
 - Files involved
 - Problem: the friction the current structure causes
@@ -44,17 +44,17 @@ Build one self-contained HTML report with a card per candidate:
 - Strength: strong, worth exploring or speculative
 - An ADR warning when the candidate contradicts a recorded decision, with the reason to reopen it
 
-End with a top recommendation: the candidate to take first and why.
+Below the cards, name any remaining candidates in one line each. End with a top recommendation: the candidate to take first and why.
 
 In T3 Code, show the report inline with `html_preview` and then `html_render`, using T3's theme variables, so it is readable on a phone. Also save it to the session's scratchpad folder, or `$TMPDIR` outside a session with one, and give the path. Outside T3, open the saved file. Save it into the repo only when the user asks.
 
-Then ask which candidates to explore.
+Then ask which candidates to explore. Use a multi-select AskUserQuestion when there are at most four, and ask in text by card number when there are more.
 
 ## 4. Explore
 
-For each candidate the user picks, expand it: the dependencies and their category, where the seam goes, what moves behind it, which tests survive and which get replaced. Update the card in the report.
+For each candidate the user picks, expand it: the dependencies and their category, where the seam goes, what moves behind it, which tests survive and which get replaced. Update the card in the report, and end with a numbered list of the candidate's open decisions.
 
-When the interface shape is open, offer "design it twice": start three Agent calls on Opus at high effort in one message, each with a different constraint. One minimizes the interface to one to three entry points. One optimizes for the most common caller. One designs around ports and adapters. Compare the designs on depth, locality and seam placement, then recommend one or a hybrid.
+When the interface shape is open, offer "design it twice": start three Agent calls in one message, each to the `Plan` agent on Opus at high effort and each with a different constraint. One minimizes the interface to one to three entry points. One optimizes for the most common caller. One designs around ports and adapters. Compare the designs on depth, locality and seam placement, then recommend one or a hybrid.
 
 ## 5. Decide
 

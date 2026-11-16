@@ -16,7 +16,7 @@ Stop at the step the request names. "Commit" stops after step 3. "Commit and pus
 
 - Run `git status --short`. If it shows changes unrelated to the task, ask which to include. Never stash or discard the user's changes.
 - Find the base branch: the PR's `baseRefName` if a PR exists, otherwise `gh repo view --json defaultBranchRef --jq .defaultBranchRef.name`. Never assume `main`.
-- Name the branch `<type>/<slug>`: a conventional commit type (`feat`, `fix`, `chore`, `docs`, `refactor`, `test`, `perf`, `ci` or `build`) and a kebab-case slug of at most five words that says what the change does, such as `fix/login-redirect-loop`. On the base branch or a detached HEAD, create it with `git switch -c <name>`. On any other branch, look up its PR with `gh pr view --json state`. If the PR is `OPEN` or `CLOSED`, keep the name, because the PR is tied to it. If there is no PR or it is `MERGED`, rename the branch with `git branch -m <name>` only when two things hold. The branch has no upstream, so `git rev-parse --abbrev-ref '@{upstream}'` fails. And its name does not already start with one of those types and a slash. A branch with an upstream is on the remote, where other people may use it, so keep its name and never delete it from the remote. A tool such as T3 may have given the branch a type name already. Keep such a name as it is, and do not rename it to get a better slug.
+- Name the branch `<type>/<slug>`: a conventional commit type (`feat`, `fix`, `chore`, `docs`, `style`, `refactor`, `test`, `perf`, `ci`, `build` or `revert`) and a kebab-case slug of at most five words that says what the change does, such as `fix/login-redirect-loop`. On the base branch or a detached HEAD, create it with `git switch -c <name>`. On any other branch, look up its PR with `gh pr view --json state`. If the PR is `OPEN` or `CLOSED`, keep the name, because the PR is tied to it. If there is no PR or it is `MERGED`, rename the branch with `git branch -m <name>` only when two things hold. The branch has no upstream, so `git rev-parse --abbrev-ref '@{upstream}'` fails. And its name does not already start with one of those types and a slash. A branch with an upstream is on the remote, where other people may use it, so keep its name and never delete it from the remote. A tool such as T3 may have given the branch a type name already. Keep such a name as it is, and do not rename it to get a better slug.
 
 ## 2. Checks
 
@@ -24,21 +24,43 @@ Run what CI runs, limited to the touched files where the repo allows it: format,
 
 ## 3. Commit
 
-Group the changes into logical commits. Write every commit title as a conventional commit: `<type>: <summary>` or `<type>(<scope>): <summary>`, with a type from the list in step 1, a lowercase summary in the imperative, and no period at the end. Mark a breaking change with `!` before the colon. Read `git log --oneline -20` and use a scope only when the repo's log already uses scopes, with the names it uses. Messages state what changed and why. Add no attribution trailer or "generated with" line.
+Group the changes into logical commits. Write every commit as a conventional commit:
+
+- The title is `<type>: <summary>` or `<type>(<scope>): <summary>`, with a type from the list in step 1. It is at most 72 characters.
+- Pick the type by what the change does for the people who use the code, because release tools build the changelog and the next version from it. `feat` adds behavior they can use. `fix` repairs behavior that was wrong for them. A change they cannot observe is `refactor`, `perf`, `test`, `docs`, `style`, `build`, `ci` or `chore`.
+- The summary is lowercase and in the imperative, with no period at the end.
+- Use a scope only when the repo's log already uses scopes, with the names it uses. `git log --oneline -20` shows them.
+- A breaking change gets `!` before the colon and a footer `BREAKING CHANGE: <what breaks and what a user must do>`. Some release tools read only one of the two.
+- A revert is `revert: <what is undone>`, a summary in your own words that follows the same rules, with `This reverts commit <sha>.` in the body.
+- The body follows one blank line after the title and states what changed and why. Footers such as `BREAKING CHANGE:` and `Refs #<issue>` follow one blank line after the body.
+- Add no attribution trailer or "generated with" line.
+
+The repo's own commit rules win over this list. Look for a commitlint config (`commitlint.config.*`, `.commitlintrc*` or a `commitlint` key in `package.json`) and for a workflow that checks the PR title, and take the allowed types, scopes and lengths from there.
+
+Check each title right after the commit, and amend the commit when it breaks the form. Before a push, list every title on the branch that breaks it:
+
+```
+git log --format=%s origin/<base>..HEAD | awk '!/^Merge / && (length > 72 || !/^(feat|fix|chore|docs|style|refactor|test|perf|ci|build|revert)(\([^)]+\))?!?: [^A-Z].*[^.]$/)'
+```
+
+No output means every title passes. A title that starts with `Merge ` is a merge commit and is left out. In a repo with commitlint, run `npx commitlint --from origin/<base> --to HEAD` in place of this command. Report a failing commit that was there before this run or that is already pushed, and do not rewrite it.
 
 ## 4. Open or update the PR
 
-Run `git fetch origin`, or fetch the remote that step 1 of `sync-base` names when `origin` is not the PR's repo. If the branch is behind the base, bring it up to date with the `sync-base` skill before pushing. The sync runs here, after the commit, because `sync-base` asks when an uncommitted change touches a file the merge brings in. Changes you left out in step 1 do not block it otherwise.
+Run `git fetch origin`, or fetch the remote that the Preflight step of `sync-base` names when `origin` is not the PR's repo. If the branch is behind the base, bring it up to date with the `sync-base` skill before pushing. The sync runs here, after the commit, because `sync-base` asks when an uncommitted change touches a file the merge brings in. Changes you left out in step 1 do not block it otherwise.
 
 Check for an existing PR first: `gh pr view --json number,url,state,body`. The command also returns merged and closed PRs. If an open one exists, push, and update the body when the scope has changed. If none exists or the PR is `MERGED`, push with `git push -u origin HEAD` and open a real PR, not a draft, so review bots run. If the PR is `CLOSED`, ask whether to reopen it or open a new one.
 
 If the remote rejects the push because its branch has commits the local one lacks, merge them with `git pull --no-rebase origin <branch>`, run the checks from step 2 again and push. Never force-push outside stack mode.
 
-Title: a conventional commit title in the form from step 3, with the type that fits the PR as a whole. A squash merge makes it the commit title on the base branch. Say why the change matters, not which mechanism changed.
+Title: a conventional commit title in the form from step 3. Its type is that of the PR's most significant commit: a breaking change first, then `feat`, then `fix`, then the rest. A squash merge makes it the commit title on the base branch. Say why the change matters, not which mechanism changed.
 
 Body, written with the `unslop` skill and checked for secrets and private details before posting:
 
 ```markdown
+> [!WARNING]
+> <merge danger, only for one-way doors: migrations, data deletion, public API removals, infra changes. Say what cannot be undone and what it affects.>
+
 ## Summary
 
 <one or two sentences: the problem, then what this PR does about it>
@@ -49,12 +71,12 @@ Body, written with the `unslop` skill and checked for secrets and private detail
 
 ## Verified
 
-<one or two lines: the checks, tests or manual runs that show it works>
-
-**Merge danger:** <only for one-way doors: migrations, data deletion, public API removals, infra changes. Say what cannot be undone and what it affects.>
+<one or two lines: the checks, tests or manual runs that show it works. Then what was not run, if anything.>
 
 Closes #<issue>
 ```
+
+When the repo has a PR template, fill it in and do not use the format above. Look for `pull_request_template.md`, in any letter case, in `.github/`, the repo root and `docs/`. When `.github/PULL_REQUEST_TEMPLATE/` holds several templates, take the one that fits the change. Keep the template's headings and checklists, and tick only the boxes that are true. Put the summary, the verification and the visual into the sections that ask for them, each as short as the format above makes it. When the template has no place for them, add the merge danger block above its first heading and `Closes #<issue>` at the end. Remove the template's instruction comments and leave no placeholder text.
 
 Add a visual only when it shows the reviewer something the bullets cannot: how files moved, a new call path, a state change, or how components interact. Pick the smallest form that makes the point:
 
@@ -115,8 +137,8 @@ mutation($threadId: ID!, $body: String!) {
 - **Failed check.** Read the failed log with `gh run view <run-id> --log-failed`. Decide whether it is a real failure or an infrastructure flake. Fix real failures, run the checks from step 2, commit and push. Re-run a flake once with `gh run rerun <run-id> --failed`; if it fails again, treat it as real.
 - **Conflict or branch behind.** Use the `sync-base` skill, run the checks, and push.
 - **Comment from `amedia-idp`.** Ignore it and do not reply. The bot posts deploy information, not review findings. Its login is `amedia-idp` in GraphQL and `gh pr view`, and `amedia-idp[bot]` in the REST API.
-- **Review comment from a bot.** Verify the finding against the code. Fix it when it is real. When it is not, or when it asks for work outside the PR's goal, reply with a one-line reason and resolve the thread.
-- **Review comment from a person.** Verify it against the code. Fix it when it is real. Before posting any reply, show the user the draft and post only after approval.
+- **Review comment from a bot.** Verify the finding against the code. When it is real, fix it, and after the push reply in the thread with the commit SHA and resolve the thread. When it is not, or when it asks for work outside the PR's goal, reply with a one-line reason and resolve the thread.
+- **Review comment from a person.** Verify it against the code. When it is real, fix it and draft a reply that names the commit SHA. Before posting any reply, show the user the draft and post only after approval. Leave resolving the thread to the person.
 
 Keep the PR at the size its goal needs. Decline extra tests, guards for cases that do not matter, and refactors the goal did not ask for, and list them as follow-ups in the report.
 
@@ -140,13 +162,13 @@ Steps 1 to 3 run as written, with one branch name per layer in the form from ste
 2. Run `gh stack init --base <base> <bottom> ... <top>`. It adopts the branches as a stack and checks out the top layer. Stay on a branch of the stack for the `gh stack` commands that follow.
 3. If the base has moved since the branch left it, run `gh stack rebase`.
 4. Run `gh stack submit --auto --open`. It pushes every branch and opens one PR per layer, each based on the layer below. `--auto` skips the interactive editor. `--open` makes the PRs ready for review, so review bots run.
-5. Set each PR's title and body with `gh pr edit <n> --title <title> --body-file <file>`, in the body format of step 4.
+5. Set each PR's title and body with `gh pr edit <n> --title <title> --body-file <file>`, in the title form and the body format of step 4.
 6. In T3 Code, link every PR to the thread.
 
 Steps 5 to 7 run for every PR in the stack, with these differences:
 
 - **A fix.** Put it in the lowest layer it applies to. Check out that branch, commit, run `gh stack rebase --upstack` to carry the fix into the layers above, then `gh stack push`. This rebases and force-pushes with a lease. It is allowed only on the branches of a stack.
-- **Base moved, conflict, or a lower layer merged.** Run `gh stack sync` in place of the `sync-base` skill. On a rebase conflict it restores the branches and stops. Then run `gh stack rebase`, resolve each conflict by the rules in step 3 of `sync-base`, stage the files, and run `GIT_EDITOR=true gh stack rebase --continue` so that no editor opens, and finish with `gh stack push`. A rebase that applies cleanly can still break the code, and a clean `gh stack sync` has already pushed. So after either path, run steps 4 and 5 of `sync-base` on each layer the rebase changed, and send what they find as a fix, as above.
+- **Base moved, conflict, or a lower layer merged.** Run `gh stack sync` in place of the `sync-base` skill. On a rebase conflict it restores the branches and stops. Then run `gh stack rebase`, resolve each conflict by the rules under "Merge and resolve" in `sync-base`, stage the files, and run `GIT_EDITOR=true gh stack rebase --continue` so that no editor opens, and finish with `gh stack push`. A rebase that applies cleanly can still break the code, and a clean `gh stack sync` has already pushed. So after either path, run the "Semantic conflict hunt" and "Verify" steps of `sync-base` on each layer the rebase changed, and send what they find as a fix, as above.
 - **Stop.** Ship is done when the required checks pass on the head commit of every layer. Report every PR link, bottom to top.
 
 Never run `gh stack merge` unless the user asked for it in this session.
