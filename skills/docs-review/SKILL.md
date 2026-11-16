@@ -22,11 +22,13 @@ Find where the documentation disagrees with itself or with the code, then settle
 - No mode: run the docs pass, then the code pass.
 - `docs` or `code`: run that pass only.
 - Doc names or areas narrow the findings to those docs or areas. Still read the other docs, because a contradiction needs both sides in view.
-- `report`: change nothing on disk. Skip step 4 and the commit in step 5, list the mechanical findings in the table with the others, and run step 6 with `ask-me` in `decide` mode, so the answers are recorded and nothing is edited or committed.
+- `report`: change nothing on disk. Skip step 4 and the commit in step 5, list the mechanical findings in the table with the others, and stop after the summary in step 5. Say that `/ask-me decide` walks the findings without edits.
 
-Run `git status --porcelain --untracked-files=no` and note whether tracked files have uncommitted changes. The commit rules in steps 5 and 6 depend on it. Run the repo's checks once and record what already fails, so that a later commit is held back only by a new failure.
+Run `git status --porcelain --untracked-files=no` and note whether tracked files have uncommitted changes. The commit rules in steps 5 and 6 depend on it. Unless the user passed `report`, run the repo's checks once and record what already fails, so that a later commit is held back only by a new failure.
 
 Read the repo's CLAUDE.md and AGENTS.md first. They name the docs layout, the working principles and any status tracking (status lines, a roadmap with open decisions, a decision register).
+
+Count the docs in scope with `git ls-files -z '*.md' '*.mdx' | xargs -0 wc -l`. Above about 8,000 lines, say the size and ask which areas to take first. One run takes what fits, so that both sides of every comparison stay in one context.
 
 Build the known-deferred list from wherever the repo records deferred work. Exclude those items from findings and confirm them in one line in the summary. A deferred item becomes a finding only when its recorded status is now wrong.
 
