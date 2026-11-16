@@ -17,7 +17,7 @@ A mode word, `docs` or `issues`, counts only at the start of the arguments. When
 Before the first round, read what the plan touches: the issue, the code, the docs and earlier decisions.
 
 - In an Amedia repo, search Edda (load the `edda:docs` skill) for ADRs and conventions that constrain the plan.
-- Send fact lookups to an Explore subagent on Haiku at medium effort. Never ask the user for something you can find in the repo, the tools or the docs.
+- Look up small facts yourself. Send a read-heavy lookup to an Explore subagent on Haiku at medium effort. Never ask the user for something you can find in the repo, the tools or the docs.
 - A pending lookup blocks only the questions that depend on it. Ask the rest now.
 
 ## 2. Ask in rounds
