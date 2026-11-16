@@ -100,6 +100,7 @@ Model choice:
 - Never merge a PR, enable auto-merge or push to the default branch unless I asked in this session.
 - Find the base branch from GitHub (`gh repo view --json defaultBranchRef` or the PR's `baseRefName`). Never assume `main`.
 - Bring a branch up to date by merging the base, never by rebasing, unless I ask. The exception is a branch in a `gh stack` stack, which `gh stack` updates by rebasing and force-pushing with a lease.
+- Write every commit title and PR title as a conventional commit. The `ship` skill holds the format.
 - No attribution trailers or "generated with" lines in commits or PRs.
 - Check PR titles, bodies and comments for secrets and private details before posting.
 
