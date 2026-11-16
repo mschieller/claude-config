@@ -2,8 +2,8 @@
 # Links this repo's CLAUDE.md into ~/.claude.
 # An existing file that is not a symlink, and a live symlink that points outside this repo,
 # is left alone and reported, so nothing is overwritten.
-# A link from ~/.claude/skills or ~/.claude/agents into this repo whose target is gone is removed.
-# The skills and agents live in the dev plugin of amedia/claude-marketplace, so links to their old copies here are dead.
+# A link from ~/.claude/skills or ~/.claude/agents into this repo whose target is gone is removed,
+# so links to skills and agents this repo no longer holds do not linger.
 set -euo pipefail
 repo="$(cd "$(dirname "$0")" && pwd)"
 target="$HOME/.claude"
